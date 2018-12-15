@@ -3,6 +3,7 @@
 #include "gamemath.h"
 #include "quaternion.h"
 
+// clang-format off
 static float filtertable[] =
 {
 	1.0e-08f, 1.0e-07f, 1.0e-06f, 1.0e-05f,
@@ -70,6 +71,7 @@ static float filtertable[] =
 		0.0f, 0.0f, 0.0f, 0.0f,
 		0.0f, 0.0f, 0.0f, 0.0f
 };
+// clang-format on
 
 bool table_valid;
 
@@ -77,8 +79,8 @@ MotionChannelClass::MotionChannelClass() :
     PivotIdx(0),
     Type(0),
     VectorLen(0),
-    UnusedInt1(0),
-    UnusedInt2(0),
+    UnusedFloat1(0),
+    UnusedFloat2(0),
     UnusedBuffer(nullptr),
     Data(nullptr),
     FirstFrame(-1),
@@ -134,7 +136,40 @@ bool MotionChannelClass::Load_W3D(ChunkLoadClass &cload)
     if (chunk_size != bytesleft) {
         cload.Seek(chunk_size - bytesleft);
     }
-    return 1;
+    // Do_Data_Compression(bytesleft);
+    return true;
+}
+
+// From Ren
+void MotionChannelClass::Get_Vector(int a2, float *a3)
+{
+    if (a2 < FirstFrame || a2 > LastFrame) {
+        set_identity(a3);
+    } else {
+        int v3 = a2 - FirstFrame;
+        if (Data) {
+            for (int i = 0; i < VectorLen; ++i) {
+                a3[i] = Data[i + VectorLen * v3];
+                ;
+            }
+        } else {
+            long double v5 = UnusedFloat2 / 65535.0;
+            for (int j = 0; j < VectorLen; ++j) {
+                a3[j] = v5 * UnusedBuffer[j + VectorLen * v3] + UnusedFloat1;
+            }
+        }
+    }
+}
+
+void MotionChannelClass::set_identity(float *setvec)
+{
+    setvec = 0;
+    if (Type == 6) {
+        setvec[0] = 0;
+        setvec[1] = 0;
+        setvec[2] = 0;
+        setvec[3] = 1.0;
+    }
 }
 
 BitChannelClass::BitChannelClass() : PivotIdx(0), Type(0), DefaultVal(0), FirstFrame(-1), LastFrame(-1), Bits(nullptr) {}
@@ -155,7 +190,7 @@ void BitChannelClass::Free()
 // BFME2 version
 bool BitChannelClass::Load_W3D(ChunkLoadClass &cload)
 {
-    unsigned int chunk_size = cload.Cur_Chunk_Length() - sizeof(W3dBitChannelStruct);
+    unsigned int chunk_size = cload.Cur_Chunk_Length();
     W3dBitChannelStruct chan;
     if (cload.Read(&chan, sizeof(W3dBitChannelStruct)) != sizeof(W3dBitChannelStruct)) {
         return false;
@@ -168,7 +203,7 @@ bool BitChannelClass::Load_W3D(ChunkLoadClass &cload)
     // need to clean this up
     unsigned int bytes = ((LastFrame - FirstFrame + 1) + 7) >> 3;
     unsigned int bytesleft = bytes - 1;
-    DEBUG_ASSERT((sizeof(W3dBitChannelStruct) + bytesleft) == cload.Cur_Chunk_Length());
+    DEBUG_ASSERT((sizeof(W3dBitChannelStruct) + bytesleft) == chunk_size);
     Bits = new unsigned char[bytes];
     //
     DEBUG_ASSERT(Bits);
@@ -177,7 +212,7 @@ bool BitChannelClass::Load_W3D(ChunkLoadClass &cload)
         Free();
         return false;
     }
-    return 1;
+    return true;
 }
 
 TimeCodedMotionChannelClass::TimeCodedMotionChannelClass() :
@@ -204,7 +239,25 @@ void TimeCodedMotionChannelClass::Free()
 
 bool TimeCodedMotionChannelClass::Load_W3D(ChunkLoadClass &cload)
 {
-    return false;
+    unsigned int chunk_size = cload.Cur_Chunk_Length() - sizeof(W3dTimeCodedAnimChannelStruct);
+    W3dTimeCodedAnimChannelStruct chan;
+    if (cload.Read(&chan, sizeof(W3dTimeCodedAnimChannelStruct)) != sizeof(W3dTimeCodedAnimChannelStruct)) {
+        return false;
+    }
+    NumTimeCodes = chan.NumTimeCodes;
+    VectorLen = chan.VectorLen;
+    Type = chan.Flags;
+    PivotIdx = chan.Pivot;
+    PacketSize = VectorLen + 1;
+    CachedIdx = 0;
+    LastTimeCodeIdx = PacketSize * (NumTimeCodes - 1);
+    Data = new unsigned int[4 * ((chunk_size >> 2) + 1)];
+    Data[0] = chan.Data[0];
+    if (cload.Read(&Data[1], chunk_size) != chunk_size) {
+        Free();
+        return false;
+    }
+    return true;
 }
 
 void TimeCodedMotionChannelClass::Get_Vector(float frame, float *setvec)
@@ -218,7 +271,7 @@ void TimeCodedMotionChannelClass::Get_Vector(float frame, float *setvec)
     } else {
         int index2 = PacketSize + index;
         unsigned int val = Data[index2];
-        if (!(val & 0x80000000)) {
+        if (!(val & 0x80000000)) { // Fast_Is_Float_Positive
             float v8 = (Data[index] & 0x7FFFFFFF);
             float *data1 = (float *)&Data[index + 1];
             float *data2 = (float *)&Data[index2 + 1];
@@ -238,7 +291,7 @@ void TimeCodedMotionChannelClass::Get_Vector(float frame, float *setvec)
 
 Quaternion TimeCodedMotionChannelClass::Get_QuatVector(float frame_idx)
 {
-    DEBUG_ASSERT(VectorLen==4);
+    DEBUG_ASSERT(VectorLen == 4);
     Quaternion q1(true);
     unsigned int a2a = frame_idx;
     int index = get_index(a2a);
@@ -249,7 +302,7 @@ Quaternion TimeCodedMotionChannelClass::Get_QuatVector(float frame_idx)
     } else {
         int index2 = PacketSize + index;
         unsigned int val = Data[index2];
-        if (val & 0x80000000) {
+        if (val & 0x80000000) { // Fast_Is_Float_Positive
             Quaternion *dq2 = (Quaternion *)&Data[index + 1];
             q1.Set(dq2->X, dq2->Y, dq2->Z, dq2->W);
             return q1;
@@ -269,13 +322,22 @@ Quaternion TimeCodedMotionChannelClass::Get_QuatVector(float frame_idx)
     }
 }
 
-void TimeCodedMotionChannelClass::set_identity(float *setvec) {}
+void TimeCodedMotionChannelClass::set_identity(float *setvec)
+{
+    setvec = 0;
+    if (Type == 6) {
+        setvec[0] = 0;
+        setvec[1] = 0;
+        setvec[2] = 0;
+        setvec[3] = 1.0;
+    }
+}
 
 unsigned int TimeCodedMotionChannelClass::get_index(unsigned int timecode)
 {
     unsigned int result;
 
-    DEBUG_ASSERT(CachedIdx<=LastTimeCodeIdx);
+    DEBUG_ASSERT(CachedIdx <= LastTimeCodeIdx);
     if (timecode < (Data[CachedIdx] & 0x7FFFFFFF)) {
         goto LABEL_15;
     }
@@ -381,7 +443,7 @@ bool TimeCodedBitChannelClass::Load_W3D(ChunkLoadClass &cload)
 
 int TimeCodedBitChannelClass::Get_Bit(int frame)
 {
-    DEBUG_ASSERT(frame>=0);
+    DEBUG_ASSERT(frame >= 0);
     DEBUG_ASSERT(CachedIdx < NumTimeCodes);
     int v3 = 0;
     if (frame >= (Bits[CachedIdx] & 0x7FFFFFFF)) {
@@ -395,7 +457,7 @@ int TimeCodedBitChannelClass::Get_Bit(int frame)
         v4 = 0;
     }
     CachedIdx = v4;
-    return (Bits[v4] & 0x80000000) == 0x80000000;
+    return (Bits[v4] & 0x80000000) == 0x80000000; // Fast_Is_Float_Positive
 }
 
 AdaptiveDeltaMotionChannelClass::AdaptiveDeltaMotionChannelClass() :
@@ -451,26 +513,26 @@ bool AdaptiveDeltaMotionChannelClass::Load_W3D(ChunkLoadClass &cload)
     Data[0] = chan.Data[0];
     if (cload.Read(&Data[1], chunk_size) != chunk_size) {
         Free();
-        return 0;
+        return false;
     }
-    return 1;
+    return true;
 }
 
 void AdaptiveDeltaMotionChannelClass::Get_Vector(float frame, float *setvec)
 {
     unsigned int v3 = frame;
-	float v4 = frame-frame;//wat
+    float v4 = frame - frame; // wat
     float value1 = AdaptiveDeltaMotionChannelClass::getframe(v3, 0);
     float value2 = AdaptiveDeltaMotionChannelClass::getframe(v3 + 1, 0);
-	// code in zh mac
-	/*
+    // code in zh mac
+    /*
     if (v3 < 0) { // help!
         *setvec = ((frame - ((v3 & 1 | (v3 >> 1)) + (v3 & 1 | (v3 >> 1)))) * (value2 - value1)) + value1;
     } else {
         *setvec = ((frame - v3) * (value2 - value1)) + value1;
     }
-	*/
-	*setvec = GameMath::Lerp(value1, value2, v4);
+    */
+    *setvec = GameMath::Lerp(value1, value2, v4);
 }
 
 Quaternion AdaptiveDeltaMotionChannelClass::Get_QuatVector(float frame_idx)
@@ -478,18 +540,10 @@ Quaternion AdaptiveDeltaMotionChannelClass::Get_QuatVector(float frame_idx)
     unsigned int frame = frame_idx;
     unsigned int next_frame = frame + 1;
     float alpha = frame_idx - frame; // wat
-    Quaternion q2(true);
-    float a = getframe(frame, 0);
-    float b = getframe(frame, 1);
-    float c = getframe(frame, 2);
-    float d = getframe(frame, 3);
-    q2.Set(a, b, c, d);
-    Quaternion q3(true);
-    float na = getframe(next_frame, 0);
-    float nb = getframe(next_frame, 1);
-    float nc = getframe(next_frame, 2);
-    float nd = getframe(next_frame, 3);
-    q3.Set(na, nb, nc, nd);
+    Quaternion q2;
+    q2.Set(getframe(frame, 0), getframe(frame, 1), getframe(frame, 2), getframe(frame, 3));
+    Quaternion q3;
+    q3.Set(getframe(next_frame, 0), getframe(next_frame, 1), getframe(next_frame, 2), getframe(next_frame, 3));
     Quaternion q(true);
     Fast_Slerp(q, q2, q3, alpha);
     return q;
@@ -519,7 +573,7 @@ float AdaptiveDeltaMotionChannelClass::getframe(unsigned int frame_idx, unsigned
         decompress(++CacheFrame, CacheData, frame_idx, &CacheData[VectorLen]);
         result = CacheData[vector_idx + VectorLen];
     } else {
-		DEBUG_ASSERT(VectorLen<=4);
+        DEBUG_ASSERT(VectorLen <= 4);
         memcpy(Dst, &CacheData[VectorLen], 4 * VectorLen);
         decompress(CacheFrame, Dst, frame_idx, CacheData);
         CacheFrame = frame_idx;
@@ -534,93 +588,89 @@ float AdaptiveDeltaMotionChannelClass::getframe(unsigned int frame_idx, unsigned
 void AdaptiveDeltaMotionChannelClass::decompress(
     unsigned int src_idx, float *srcdata, unsigned int frame_idx, float *outdata)
 {
-	char v7[4];
+    char v7[4];
 
-	DEBUG_ASSERT(src_idx<frame_idx);
-	unsigned int src_idxa = src_idx+1;
-	float *base = (float *)&Data[VectorLen];
-	bool done = 0;
-	for (int i = 0; i<VectorLen; ++i) {
-		float *v14 = (float *)((char *)base
-			+9*i
-			+((src_idxa-1)>>4)*9*VectorLen);
-		int v13 = ((char)src_idxa-1)&0xF;
-		float v12 = srcdata[i];
-		unsigned int v11 = src_idxa;
-		while (v11<=frame_idx) {
-			int v10 = *(char *)v14;
-			float *v15 = (float *)((char *)v14+1);
-			while (v13<0x10) {
-				int v9 = v13>>1;
-				if (v13&1) {
-					*(int *)v7 = (signed int)*((char *)v15+v9)>>4;
-				}
-				else {
-					v7[0] = *((char *)v15+v9);
-				}
-				int v8 = v7[0]&0xF;
-				if (v8&8) {
-					v8 |= 0xFFFFFFF0;
-				}
-				float v5 = filtertable[v10]*Scale;
-				float v6 = (double)v8 * v5;
-				v12 = v12+v6;
-				if (v11==frame_idx) {
-					done = 1;
-					break;
-				}
-				++v11;
-				++v13;
-			}
-			v13 = 0;
-			if (done) {
-				break;
-			}
-			v14 = (float *)((char *)v15+9*VectorLen-1);
-		}
-		outdata[i] = v12;
-	}
+    DEBUG_ASSERT(src_idx < frame_idx);
+    unsigned int src_idxa = src_idx + 1;
+    float *base = (float *)&Data[VectorLen];
+    bool done = 0;
+    for (int i = 0; i < VectorLen; ++i) {
+        float *v14 = (float *)((char *)base + 9 * i + ((src_idxa - 1) >> 4) * 9 * VectorLen);
+        int v13 = ((char)src_idxa - 1) & 0xF;
+        float v12 = srcdata[i];
+        unsigned int v11 = src_idxa;
+        while (v11 <= frame_idx) {
+            int v10 = *(char *)v14;
+            float *v15 = (float *)((char *)v14 + 1);
+            while (v13 < 0x10) {
+                int v9 = v13 >> 1;
+                if (v13 & 1) {
+                    *(int *)v7 = (signed int)*((char *)v15 + v9) >> 4;
+                } else {
+                    v7[0] = *((char *)v15 + v9);
+                }
+                int v8 = v7[0] & 0xF;
+                if (v8 & 8) {
+                    v8 |= 0xFFFFFFF0;
+                }
+                float scale = filtertable[v10] * Scale;
+                float v6 = (double)v8 * scale;
+                v12 = v12 + v6;
+                if (v11 == frame_idx) {
+                    done = 1;
+                    break;
+                }
+                ++v11;
+                ++v13;
+            }
+            v13 = 0;
+            if (done) {
+                break;
+            }
+            v14 = (float *)((char *)v15 + 9 * VectorLen - 1);
+        }
+        outdata[i] = v12;
+    }
 }
 
 void AdaptiveDeltaMotionChannelClass::decompress(unsigned int frame_idx, float *outdata)
 {
-	char v5[4];
+    char v5[4];
 
-	float *v16 = (float *)Data;
-	bool done = 0;
-	for (int i = 0; i<VectorLen; ++i) {
-		float* v12 = (float *)((char *)Data+9*i+4*VectorLen);
-		float v11 = v16[i];
-		unsigned int v10 = 1;
-		while (v10<=frame_idx) {
-			int v9 = *(char *)v12;
-			float *v13 = (float *)((char *)v12+1);
-			for (int j = 0; j<16; ++j) {
-				signed int v7 = j>>1;
-				if (j&1) {
-					*(int *)v5 = (signed int)*((char *)v13+v7)>>4;
-				}
-				else {
-					v5[0] = *((char *)v13+v7);
-				}
-				int v6 = v5[0]&0xF;
-				if (v6&8) {
-					v6 |= 0xFFFFFFF0;
-				}
-				float v3 = filtertable[v9]*Scale;
-				float v4 = (double)v6 * v3;
-				v11 = v11+v4;
-				if (v10==frame_idx) {
-					done = 1;
-					break;
-				}
-				++v10;
-			}
-			if (done) {
-				break;
-			}
-			v12 = (float *)((char *)v13+9*VectorLen-1);
-		}
-		outdata[i] = v11;
-	}
+    float *srcdata = (float *)Data;
+    bool done = 0;
+    for (int i = 0; i < VectorLen; ++i) {
+        float *v12 = (float *)((char *)Data + 9 * i + 4 * VectorLen);
+        float v11 = srcdata[i];
+        unsigned int v10 = 1;
+        while (v10 <= frame_idx) {
+            int v9 = *(char *)v12;
+            float *v13 = (float *)((char *)v12 + 1);
+            for (int j = 0; j < 16; ++j) {
+                signed int v7 = j >> 1;
+                if (j & 1) {
+                    *(int *)v5 = (signed int)*((char *)v13 + v7) >> 4;
+                } else {
+                    v5[0] = *((char *)v13 + v7);
+                }
+                int v6 = v5[0] & 0xF;
+                if (v6 & 8) {
+                    v6 |= 0xFFFFFFF0;
+                }
+                float scale = filtertable[v9] * Scale;
+                float v4 = (double)v6 * scale;
+                v11 = v11 + v4;
+                if (v10 == frame_idx) {
+                    done = 1;
+                    break;
+                }
+                ++v10;
+            }
+            if (done) {
+                break;
+            }
+            v12 = (float *)((char *)v13 + 9 * VectorLen - 1);
+        }
+        outdata[i] = v11;
+    }
 }

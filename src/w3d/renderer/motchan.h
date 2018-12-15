@@ -57,24 +57,24 @@ class MotionChannelClass : W3DMPO
 {
 public:
     MotionChannelClass();
-    ~MotionChannelClass();
+    virtual ~MotionChannelClass();
     void Free();
     int A4E450();
     bool Load_W3D(ChunkLoadClass &cload);
     int Get_Type() { return Type; }
     int Get_Pivot() { return PivotIdx; }
-	void Get_Vector(int, float *) {};
+	void Get_Vector(int, float *);
 	void Get_Vector_As_Quat(int, class Quaternion &) {};
-	void set_identity(float *) {};
+	void set_identity(float *);
 	void Do_Data_Compression(int) {};
 
 private:
     unsigned int PivotIdx;
     unsigned int Type;
     int VectorLen;
-    int UnusedInt1;
-    int UnusedInt2;
-    float *UnusedBuffer;
+    int UnusedFloat1;
+    int UnusedFloat2;
+    short *UnusedBuffer;
     float *Data;
     int FirstFrame;
     int LastFrame;
@@ -84,7 +84,7 @@ class BitChannelClass : W3DMPO
 {
 public:
     BitChannelClass();
-    ~BitChannelClass();
+	virtual ~BitChannelClass();
     void Free();
     bool Load_W3D(ChunkLoadClass &cload);
     int Get_Type() { return Type; }
@@ -103,7 +103,7 @@ class TimeCodedMotionChannelClass : W3DMPO
 {
 public:
 	TimeCodedMotionChannelClass();
-	~TimeCodedMotionChannelClass();
+	virtual ~TimeCodedMotionChannelClass();
 	void Free();
 	bool Load_W3D(ChunkLoadClass& cload);
 	int Get_Type() { return Type; }
@@ -129,7 +129,7 @@ class TimeCodedBitChannelClass : W3DMPO
 {
 public:
 	TimeCodedBitChannelClass();
-	~TimeCodedBitChannelClass();
+	virtual ~TimeCodedBitChannelClass();
 	void Free();
 	bool Load_W3D(ChunkLoadClass& cload);
 	int Get_Type() { return Type; }
@@ -150,7 +150,7 @@ class AdaptiveDeltaMotionChannelClass : W3DMPO
 {
 public:
 	AdaptiveDeltaMotionChannelClass();
-	~AdaptiveDeltaMotionChannelClass();
+	virtual ~AdaptiveDeltaMotionChannelClass();
 	void Free();
 	bool Load_W3D(ChunkLoadClass& cload);
 	int Get_Type() { return Type; }
