@@ -194,6 +194,7 @@ set(GAMEENGINE_SRC
     w3d/renderer/textureloadtasklist.cpp
     w3d/renderer/w3d.cpp
     w3d/renderer/w3dformat.cpp
+    w3d/renderer/motchan.cpp
 )
 
 # Glob all the header files together to add to the project for msvc/xcode.
