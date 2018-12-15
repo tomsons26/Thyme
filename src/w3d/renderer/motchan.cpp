@@ -3,6 +3,76 @@
 #include "gamemath.h"
 #include "quaternion.h"
 
+static float filtertable[] =
+{
+	1.0e-08f, 1.0e-07f, 1.0e-06f, 1.0e-05f,
+		0.0001f, 0.001f, 0.01f, 0.1f,
+		1.0f, 10.0f, 100.0f, 1000.0f,
+		10000.0f, 100000.0f, 1000000.0f, 10000000.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f
+};
+
+bool table_valid;
+
 MotionChannelClass::MotionChannelClass() :
     PivotIdx(0),
     Type(0),
@@ -338,14 +408,12 @@ AdaptiveDeltaMotionChannelClass::AdaptiveDeltaMotionChannelClass() :
     CacheFrame(0),
     CacheData(nullptr)
 {
-    /* fixpzl
     if (!table_valid) {
-        for (i = 0; i < 240; ++i) {
+        for (int i = 0; i < 240; ++i) {
             filtertable[i + 16] = 1.0 - GameMath::Sin(i / 240.0 * DEG_TO_RAD(90.0));
         }
         table_valid = 1;
     }
-    */
 }
 
 AdaptiveDeltaMotionChannelClass::~AdaptiveDeltaMotionChannelClass()
@@ -466,10 +534,93 @@ float AdaptiveDeltaMotionChannelClass::getframe(unsigned int frame_idx, unsigned
 void AdaptiveDeltaMotionChannelClass::decompress(
     unsigned int src_idx, float *srcdata, unsigned int frame_idx, float *outdata)
 {
-    // hyelp
+	char v7[4];
+
+	DEBUG_ASSERT(src_idx<frame_idx);
+	unsigned int src_idxa = src_idx+1;
+	float *base = (float *)&Data[VectorLen];
+	bool done = 0;
+	for (int i = 0; i<VectorLen; ++i) {
+		float *v14 = (float *)((char *)base
+			+9*i
+			+((src_idxa-1)>>4)*9*VectorLen);
+		int v13 = ((char)src_idxa-1)&0xF;
+		float v12 = srcdata[i];
+		unsigned int v11 = src_idxa;
+		while (v11<=frame_idx) {
+			int v10 = *(char *)v14;
+			float *v15 = (float *)((char *)v14+1);
+			while (v13<0x10) {
+				int v9 = v13>>1;
+				if (v13&1) {
+					*(int *)v7 = (signed int)*((char *)v15+v9)>>4;
+				}
+				else {
+					v7[0] = *((char *)v15+v9);
+				}
+				int v8 = v7[0]&0xF;
+				if (v8&8) {
+					v8 |= 0xFFFFFFF0;
+				}
+				float v5 = filtertable[v10]*Scale;
+				float v6 = (double)v8 * v5;
+				v12 = v12+v6;
+				if (v11==frame_idx) {
+					done = 1;
+					break;
+				}
+				++v11;
+				++v13;
+			}
+			v13 = 0;
+			if (done) {
+				break;
+			}
+			v14 = (float *)((char *)v15+9*VectorLen-1);
+		}
+		outdata[i] = v12;
+	}
 }
 
 void AdaptiveDeltaMotionChannelClass::decompress(unsigned int frame_idx, float *outdata)
 {
-    // hyelp
+	char v5[4];
+
+	float *v16 = (float *)Data;
+	bool done = 0;
+	for (int i = 0; i<VectorLen; ++i) {
+		float* v12 = (float *)((char *)Data+9*i+4*VectorLen);
+		float v11 = v16[i];
+		unsigned int v10 = 1;
+		while (v10<=frame_idx) {
+			int v9 = *(char *)v12;
+			float *v13 = (float *)((char *)v12+1);
+			for (int j = 0; j<16; ++j) {
+				signed int v7 = j>>1;
+				if (j&1) {
+					*(int *)v5 = (signed int)*((char *)v13+v7)>>4;
+				}
+				else {
+					v5[0] = *((char *)v13+v7);
+				}
+				int v6 = v5[0]&0xF;
+				if (v6&8) {
+					v6 |= 0xFFFFFFF0;
+				}
+				float v3 = filtertable[v9]*Scale;
+				float v4 = (double)v6 * v3;
+				v11 = v11+v4;
+				if (v10==frame_idx) {
+					done = 1;
+					break;
+				}
+				++v10;
+			}
+			if (done) {
+				break;
+			}
+			v12 = (float *)((char *)v13+9*VectorLen-1);
+		}
+		outdata[i] = v11;
+	}
 }
