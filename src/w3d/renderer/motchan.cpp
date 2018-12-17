@@ -1,7 +1,6 @@
 #include "motchan.h"
 #include "gamedebug.h"
 #include "gamemath.h"
-#include "quaternion.h"
 
 // clang-format off
 static float filtertable[] =
@@ -105,13 +104,6 @@ void MotionChannelClass::Free()
     }
 }
 
-// not sure if this belongs here....
-int MotionChannelClass::A4E450()
-{
-    //?
-    return 4 * VectorLen * (LastFrame - FirstFrame + 1) + 0x20;
-}
-
 // ZH version
 bool MotionChannelClass::Load_W3D(ChunkLoadClass &cload)
 {
@@ -138,6 +130,12 @@ bool MotionChannelClass::Load_W3D(ChunkLoadClass &cload)
     }
     // Do_Data_Compression(bytesleft);
     return true;
+}
+
+// from BFME2 WB, used by NodeMotionStruct's
+unsigned int MotionChannelClass::Estimate_Size()
+{
+    return 4 * VectorLen * (LastFrame - FirstFrame + 1) + sizeof(MotionChannelClass);
 }
 
 // From Ren
@@ -201,7 +199,7 @@ bool BitChannelClass::Load_W3D(ChunkLoadClass &cload)
     PivotIdx = chan.Pivot;
     DefaultVal = chan.DefaultVal;
     // need to clean this up
-    unsigned int bytes = ((LastFrame - FirstFrame + 1) + 7) >> 3;
+    unsigned int bytes = ((LastFrame - FirstFrame + 1) + 7) / 8;
     unsigned int bytesleft = bytes - 1;
     DEBUG_ASSERT((sizeof(W3dBitChannelStruct) + bytesleft) == chunk_size);
     Bits = new unsigned char[bytes];
@@ -213,6 +211,12 @@ bool BitChannelClass::Load_W3D(ChunkLoadClass &cload)
         return false;
     }
     return true;
+}
+
+// from BFME2 WB, used by NodeMotionStruct's
+unsigned int BitChannelClass::Estimate_Size()
+{
+    return ((LastFrame - FirstFrame + 1) + 7) / 8 + sizeof(BitChannelClass);
 }
 
 TimeCodedMotionChannelClass::TimeCodedMotionChannelClass() :
@@ -251,13 +255,19 @@ bool TimeCodedMotionChannelClass::Load_W3D(ChunkLoadClass &cload)
     PacketSize = VectorLen + 1;
     CachedIdx = 0;
     LastTimeCodeIdx = PacketSize * (NumTimeCodes - 1);
-    Data = new unsigned int[4 * ((chunk_size >> 2) + 1)];
+    Data = new unsigned int[4 * ((chunk_size / 4) + 1)];
     Data[0] = chan.Data[0];
     if (cload.Read(&Data[1], chunk_size) != chunk_size) {
         Free();
         return false;
     }
     return true;
+}
+
+// from BFME2 WB, used by NodeMotionStruct's
+unsigned int TimeCodedMotionChannelClass::Estimate_Size()
+{
+    return 4 * PacketSize * NumTimeCodes + sizeof(TimeCodedMotionChannelClass);
 }
 
 void TimeCodedMotionChannelClass::Get_Vector(float frame, float *setvec)
@@ -271,7 +281,7 @@ void TimeCodedMotionChannelClass::Get_Vector(float frame, float *setvec)
     } else {
         int index2 = PacketSize + index;
         unsigned int val = Data[index2];
-        if (!(val & 0x80000000)) { // Fast_Is_Float_Positive
+        if (GameMath::Fast_Is_Float_Positive(val)) {
             float v8 = (Data[index] & 0x7FFFFFFF);
             float *data1 = (float *)&Data[index + 1];
             float *data2 = (float *)&Data[index2 + 1];
@@ -302,11 +312,7 @@ Quaternion TimeCodedMotionChannelClass::Get_QuatVector(float frame_idx)
     } else {
         int index2 = PacketSize + index;
         unsigned int val = Data[index2];
-        if (val & 0x80000000) { // Fast_Is_Float_Positive
-            Quaternion *dq2 = (Quaternion *)&Data[index + 1];
-            q1.Set(dq2->X, dq2->Y, dq2->Z, dq2->W);
-            return q1;
-        } else {
+        if (GameMath::Fast_Is_Float_Positive(val)) {
             float v10 = (Data[index] & 0x7FFFFFFF);
             float v9 = (val & 0x7FFFFFFF);
             float alpha = (frame_idx - v10) / (v9 - v10);
@@ -317,6 +323,10 @@ Quaternion TimeCodedMotionChannelClass::Get_QuatVector(float frame_idx)
             q2.Set(dq3->X, dq3->Y, dq3->Z, dq3->W);
             q3.Set(dq4->X, dq4->Y, dq4->Z, dq4->W);
             Fast_Slerp(q1, q2, q3, alpha);
+            return q1;
+        } else {
+            Quaternion *dq2 = (Quaternion *)&Data[index + 1];
+            q1.Set(dq2->X, dq2->Y, dq2->Z, dq2->W);
             return q1;
         }
     }
@@ -441,23 +451,29 @@ bool TimeCodedBitChannelClass::Load_W3D(ChunkLoadClass &cload)
     return true;
 }
 
+// from BFME2 WB, used by NodeMotionStruct's
+unsigned int TimeCodedBitChannelClass::Estimate_Size()
+{
+    return 4 * NumTimeCodes + sizeof(TimeCodedBitChannelClass);
+}
+
 int TimeCodedBitChannelClass::Get_Bit(int frame)
 {
     DEBUG_ASSERT(frame >= 0);
     DEBUG_ASSERT(CachedIdx < NumTimeCodes);
-    int v3 = 0;
+    unsigned int count = 0;
     if (frame >= (Bits[CachedIdx] & 0x7FFFFFFF)) {
-        v3 = CachedIdx + 1;
+        count = CachedIdx + 1;
     }
-    while (v3 < NumTimeCodes && frame >= (Bits[v3] & 0x7FFFFFFF)) {
-        ++v3;
+    while (count < NumTimeCodes && frame >= (Bits[count] & 0x7FFFFFFF)) {
+        ++count;
     }
-    int v4 = v3 - 1;
-    if (v4 < 0) {
-        v4 = 0;
+    int index = count - 1;
+    if (index < 0) {
+        index = 0;
     }
-    CachedIdx = v4;
-    return (Bits[v4] & 0x80000000) == 0x80000000; // Fast_Is_Float_Positive
+    CachedIdx = index;
+    return (Bits[index] & 0x80000000) == 0x80000000;
 }
 
 AdaptiveDeltaMotionChannelClass::AdaptiveDeltaMotionChannelClass() :
@@ -509,13 +525,20 @@ bool AdaptiveDeltaMotionChannelClass::Load_W3D(ChunkLoadClass &cload)
     Scale = chan.Scale;
     CacheFrame = 0x7FFFFFFF; // todo find out what this is
     CacheData = new float[8 * VectorLen];
-    Data = new unsigned int[4 * ((chunk_size >> 2) + 1)]; // fix this
+    Data = new unsigned int[4 * ((chunk_size / 4) + 1)]; // fix this
     Data[0] = chan.Data[0];
     if (cload.Read(&Data[1], chunk_size) != chunk_size) {
         Free();
         return false;
     }
     return true;
+}
+
+// from BFME2 WB, used by NodeMotionStruct's
+unsigned int AdaptiveDeltaMotionChannelClass::Estimate_Size()
+{
+    // needs to be verified it uses CacheFrame, think it could be chunksize..
+    return CacheFrame + 8 * VectorLen + sizeof(AdaptiveDeltaMotionChannelClass);
 }
 
 void AdaptiveDeltaMotionChannelClass::Get_Vector(float frame, float *setvec)
