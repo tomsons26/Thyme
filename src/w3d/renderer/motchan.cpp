@@ -107,9 +107,9 @@ void MotionChannelClass::Free()
 // ZH version
 bool MotionChannelClass::Load_W3D(ChunkLoadClass &cload)
 {
-    unsigned int chunk_size = cload.Cur_Chunk_Length() - sizeof(W3dAnimChannelStruct);
     W3dAnimChannelStruct chan;
-    if (cload.Read(&chan, sizeof(W3dAnimChannelStruct)) != sizeof(W3dAnimChannelStruct)) {
+    unsigned int chunk_size = cload.Cur_Chunk_Length() - sizeof(chan);
+    if (cload.Read(&chan, sizeof(chan)) != sizeof(chan)) {
         return false;
     }
     FirstFrame = chan.FirstFrame;
@@ -188,9 +188,9 @@ void BitChannelClass::Free()
 // BFME2 version
 bool BitChannelClass::Load_W3D(ChunkLoadClass &cload)
 {
-    unsigned int chunk_size = cload.Cur_Chunk_Length();
     W3dBitChannelStruct chan;
-    if (cload.Read(&chan, sizeof(W3dBitChannelStruct)) != sizeof(W3dBitChannelStruct)) {
+    unsigned int chunk_size = cload.Cur_Chunk_Length();
+    if (cload.Read(&chan, sizeof(chan)) != sizeof(chan)) {
         return false;
     }
     FirstFrame = chan.FirstFrame;
@@ -243,9 +243,9 @@ void TimeCodedMotionChannelClass::Free()
 
 bool TimeCodedMotionChannelClass::Load_W3D(ChunkLoadClass &cload)
 {
-    unsigned int chunk_size = cload.Cur_Chunk_Length() - sizeof(W3dTimeCodedAnimChannelStruct);
     W3dTimeCodedAnimChannelStruct chan;
-    if (cload.Read(&chan, sizeof(W3dTimeCodedAnimChannelStruct)) != sizeof(W3dTimeCodedAnimChannelStruct)) {
+    unsigned int chunk_size = cload.Cur_Chunk_Length() - sizeof(chan);
+    if (cload.Read(&chan, sizeof(chan)) != sizeof(chan)) {
         return false;
     }
     NumTimeCodes = chan.NumTimeCodes;
@@ -427,10 +427,10 @@ void TimeCodedBitChannelClass::Free()
 
 bool TimeCodedBitChannelClass::Load_W3D(ChunkLoadClass &cload)
 {
+    W3dTimeCodedBitChannelStruct chan;
     Free();
     unsigned int chunk_size = cload.Cur_Chunk_Length();
-    W3dTimeCodedBitChannelStruct chan;
-    if (cload.Read(&chan, sizeof(W3dTimeCodedBitChannelStruct)) != sizeof(W3dTimeCodedBitChannelStruct)) {
+    if (cload.Read(&chan, sizeof(chan)) != sizeof(chan)) {
         return false;
     }
     NumTimeCodes = chan.NumTimeCodes;
@@ -439,7 +439,7 @@ bool TimeCodedBitChannelClass::Load_W3D(ChunkLoadClass &cload)
     DefaultVal = chan.DefaultVal;
     CachedIdx = 0;
     int bytesleft = 4 * NumTimeCodes - 4;
-    DEBUG_ASSERT((sizeof(W3dTimeCodedBitChannelStruct) + bytesleft) == (unsigned)chunk_size);
+    DEBUG_ASSERT((sizeof(chan) + bytesleft) == (unsigned)chunk_size);
     Bits = new unsigned int[4 * NumTimeCodes];
     DEBUG_ASSERT(Bits);
     Bits[0] = chan.Data[0];
@@ -513,9 +513,9 @@ void AdaptiveDeltaMotionChannelClass::Free()
 
 bool AdaptiveDeltaMotionChannelClass::Load_W3D(ChunkLoadClass &cload)
 {
-    unsigned int chunk_size = cload.Cur_Chunk_Length() - sizeof(W3dAdaptiveDeltaAnimChannelStruct);
     W3dAdaptiveDeltaAnimChannelStruct chan;
-    if (cload.Read(&chan, sizeof(W3dAdaptiveDeltaAnimChannelStruct)) != sizeof(W3dAdaptiveDeltaAnimChannelStruct)) {
+    unsigned int chunk_size = cload.Cur_Chunk_Length() - sizeof(chan);
+    if (cload.Read(&chan, sizeof(chan)) != sizeof(chan)) {
         return false;
     }
     VectorLen = chan.VectorLen;
@@ -696,4 +696,99 @@ void AdaptiveDeltaMotionChannelClass::decompress(unsigned int frame_idx, float *
         }
         outdata[i] = v11;
     }
+}
+
+MotionChannelClassBase::MotionChannelClassBase() : Channel(-1), PivotIdx(-1) {}
+
+MotionChannelClassBase *MotionChannelClassBase::Read_Motion_Channel(ChunkLoadClass &cload)
+{
+    W3dCompressedMotionChannelStruct chan;
+    if (cload.Read(&chan, sizeof(chan)) != sizeof(chan)) {
+        return nullptr;
+    } else if (chan.zero != 0) {
+        return nullptr;
+    }
+    MotionChannelClassBase *motchan;
+    switch (chan.Type) {
+        case 0:
+            motchan = new MotionChannelTimeCoded();
+            break;
+        case 1:
+            motchan = new MotionChannelAdaptiveDelta4;
+            break;
+        case 2:
+            motchan = new MotionChannelAdaptiveDelta8;
+            break;
+        default:
+            return nullptr;
+    }
+    if (motchan) {
+        motchan->Channel = chan.Channel;
+        motchan->PivotIdx = chan.Pivot;
+        motchan->NumTimeCodes = chan.NumTimeCodes;
+        motchan->VectorLen = chan.VectorLen;
+        if (!motchan->Load_W3D(cload)) {
+            delete motchan;
+        }
+        return motchan;
+    }
+    return nullptr;
+}
+
+MotionChannelTimeCoded::MotionChannelTimeCoded() : MotionChannelClassBase(), Data1(nullptr), Data2(nullptr) {}
+
+bool MotionChannelTimeCoded::Load_W3D(ChunkLoadClass &cload)
+{
+    unsigned int size1 = 2 * NumTimeCodes;
+    unsigned int size2 = 4 * VectorLen * NumTimeCodes;
+    Data1 = new short[size1];
+    Data2 = new unsigned int[size2];
+    if (cload.Read(Data1, size1) != size1) {
+        return false;
+    }
+    if (NumTimeCodes & 1) {
+        cload.Seek(sizeof(short));
+    }
+    if (cload.Read(Data1, size2) != size2) {
+        return false;
+    }
+    return true;
+}
+
+unsigned int MotionChannelTimeCoded::Estimate_Size()
+{
+    return NumTimeCodes * (4 * VectorLen + 2) + sizeof(MotionChannelTimeCoded);
+}
+
+MotionChannelAdaptiveDelta::MotionChannelAdaptiveDelta() : MotionChannelClassBase(), Data(nullptr) {}
+
+bool MotionChannelAdaptiveDelta::Load_W3D(ChunkLoadClass &cload)
+{
+    DEBUG_ASSERT(VectorLen <= 4);
+    if (cload.Read(&Scale, sizeof(Scale)) != sizeof(Scale)) {
+        return false;
+    }
+    if (cload.Read(floats, 4 * VectorLen) != 4 * VectorLen) {
+        return false;
+    }
+    unsigned int size = cload.Cur_Chunk_Length() - 12 - 4 * VectorLen;
+    Data = new unsigned int[size];
+    if (cload.Read(Data, size) != size) {
+        return false;
+    }
+    return true;
+}
+
+MotionChannelAdaptiveDelta4::MotionChannelAdaptiveDelta4() : MotionChannelAdaptiveDelta() {}
+
+unsigned int MotionChannelAdaptiveDelta4::Estimate_Size()
+{
+    return 9 * VectorLen * ((NumTimeCodes + 15) / 16) + 4;
+}
+
+MotionChannelAdaptiveDelta8::MotionChannelAdaptiveDelta8() : MotionChannelAdaptiveDelta() {}
+
+unsigned int MotionChannelAdaptiveDelta8::Estimate_Size()
+{
+    return 17 * VectorLen * ((NumTimeCodes + 15) / 16) + 4;
 }

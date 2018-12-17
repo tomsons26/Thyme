@@ -175,3 +175,92 @@ private:
     unsigned int CacheFrame;
     float *CacheData;
 };
+
+// Following is from BFME2 WB
+struct W3dCompressedMotionChannelStruct
+{
+    char zero; // must be 0 or bails reading
+    char Type;
+    char VectorLen;
+    char Channel;
+    short NumTimeCodes; // union? NumFrames for AD?
+    short Pivot;
+};
+
+class MotionChannelClassBase
+{
+public:
+    MotionChannelClassBase();
+    virtual bool Load_W3D(ChunkLoadClass &cload) = 0;
+    virtual ~MotionChannelClassBase(){};
+    virtual unsigned int Size() = 0; // dunno what this size is of
+    virtual void Get_Scalar() = 0;
+    virtual void Get_Vector() = 0;
+    virtual void Get_Quaternion() = 0;
+    virtual unsigned int Estimate_Size() = 0;
+    unsigned int Get_Channel() { return Channel; }
+    unsigned int Get_Pivot() { return PivotIdx; }
+    static MotionChannelClassBase *Read_Motion_Channel(ChunkLoadClass &cload);
+
+protected:
+    unsigned int Channel;
+    unsigned int PivotIdx;
+    unsigned int NumTimeCodes;
+    unsigned int VectorLen;
+};
+
+class MotionChannelTimeCoded : public MotionChannelClassBase
+{
+public:
+    MotionChannelTimeCoded();
+    virtual bool Load_W3D(ChunkLoadClass &cload) override;
+    virtual ~MotionChannelTimeCoded() override{};
+    virtual unsigned int Size() override { return 4; };
+    virtual void Get_Scalar() override{};
+    virtual void Get_Vector() override{};
+    virtual void Get_Quaternion() override{};
+    virtual unsigned int Estimate_Size() override;
+
+private:
+    short *Data1;
+    unsigned int *Data2;
+};
+
+class MotionChannelAdaptiveDelta : public MotionChannelClassBase
+{
+public:
+    MotionChannelAdaptiveDelta();
+    virtual bool Load_W3D(ChunkLoadClass &cload) override;
+    virtual ~MotionChannelAdaptiveDelta() override{};
+    virtual unsigned int Size() override { return 8 * VectorLen + 4; };
+    virtual void Get_Scalar() override{};
+    virtual void Get_Vector() override{};
+    virtual void Get_Quaternion() override{};
+
+protected:
+    float Scale;
+    float floats[4]; // dunno
+    unsigned int *Data;
+};
+
+class MotionChannelAdaptiveDelta4 : public MotionChannelAdaptiveDelta
+{
+public:
+    MotionChannelAdaptiveDelta4();
+    virtual ~MotionChannelAdaptiveDelta4() override{};
+    virtual void Get_Scalar() override{};
+    virtual void Get_Vector() override{};
+    virtual void Get_Quaternion() override{};
+    virtual unsigned int Estimate_Size() override;
+};
+
+class MotionChannelAdaptiveDelta8 : public MotionChannelAdaptiveDelta
+{
+public:
+    MotionChannelAdaptiveDelta8();
+    virtual ~MotionChannelAdaptiveDelta8() override{};
+    virtual void Get_Scalar() override{};
+    virtual void Get_Vector() override{};
+    virtual void Get_Quaternion() override{};
+    virtual unsigned int Estimate_Size() override;
+};
