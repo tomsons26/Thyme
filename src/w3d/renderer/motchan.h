@@ -65,9 +65,10 @@ public:
     int Get_Type() { return Type; }
     int Get_Pivot() { return PivotIdx; }
     void Get_Vector(int, float *);
-    void Get_Vector_As_Quat(int, class Quaternion &){};
-    void set_identity(float *);
-    void Do_Data_Compression(int){};
+    //not sure if these exist anywhere as code but noting for future
+    //void Get_Vector_As_Quat(int, class Quaternion &){};
+    void Set_Identity(float *);
+    void Do_Data_Compression(int){};//code exists but i don't get how to do it
 
 private:
     unsigned int PivotIdx;
@@ -91,6 +92,8 @@ public:
     unsigned int Estimate_Size();
     int Get_Type() { return Type; }
     int Get_Pivot() { return PivotIdx; }
+    //not sure if this exists anywhere as code but noting for future
+    int Get_Bit(int frame);
 
 private:
     unsigned int PivotIdx;
@@ -112,10 +115,10 @@ public:
     int Get_Type() { return Type; }
     int Get_Pivot() { return PivotIdx; }
     void Get_Vector(float frame, float *setvec);
-    Quaternion Get_QuatVector(float frame_idx);
-    void set_identity(float *setvec);
-    unsigned int get_index(unsigned int timecode);
-    unsigned int binary_search_index(unsigned int timecode);
+    Quaternion Get_Quat_Vector(float frame_idx);
+    void Set_Identity(float *setvec);
+    unsigned int Get_Index(unsigned int timecode);
+    unsigned int Binary_Search_Index(unsigned int timecode);
 
 private:
     unsigned int PivotIdx;
@@ -160,10 +163,10 @@ public:
     int Get_Type() { return Type; }
     int Get_Pivot() { return PivotIdx; }
     void Get_Vector(float frame, float *setvec);
-    Quaternion Get_QuatVector(float frame_idx);
-    float getframe(unsigned int frame_idx, unsigned int vector_idx);
-    void decompress(unsigned int src_idx, float *srcdata, unsigned int frame_idx, float *outdata);
-    void decompress(unsigned int frame_idx, float *outdata);
+    Quaternion Get_Quat_Vector(float frame_idx);
+    float Get_Frame(unsigned int frame_idx, unsigned int vector_idx);
+    void Decompress(unsigned int src_idx, float *srcdata, unsigned int frame_idx, float *outdata);
+    void Decompress(unsigned int frame_idx, float *outdata);
 
 private:
     unsigned int PivotIdx;
