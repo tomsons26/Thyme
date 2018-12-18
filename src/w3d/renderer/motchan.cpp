@@ -263,7 +263,7 @@ bool TimeCodedMotionChannelClass::Load_W3D(ChunkLoadClass &cload)
     PacketSize = VectorLen + 1;
     CachedIdx = 0;
     LastTimeCodeIdx = PacketSize * (NumTimeCodes - 1);
-    Data = new unsigned int[4 * ((chunk_size / 4) + 1)];
+    Data = new unsigned int[((chunk_size / 4) + 1)];
     Data[0] = chan.Data[0];
     if (cload.Read(&Data[1], chunk_size) != chunk_size) {
         Free();
@@ -448,7 +448,7 @@ bool TimeCodedBitChannelClass::Load_W3D(ChunkLoadClass &cload)
     CachedIdx = 0;
     int bytesleft = 4 * NumTimeCodes - 4;
     DEBUG_ASSERT((sizeof(chan) + bytesleft) == (unsigned)chunk_size);
-    Bits = new unsigned int[4 * NumTimeCodes];
+    Bits = new unsigned int[NumTimeCodes];
     DEBUG_ASSERT(Bits);
     Bits[0] = chan.Data[0];
     if (bytesleft && cload.Read(&Bits[1], bytesleft) != bytesleft) {
@@ -532,8 +532,8 @@ bool AdaptiveDeltaMotionChannelClass::Load_W3D(ChunkLoadClass &cload)
     NumFrames = chan.NumFrames;
     Scale = chan.Scale;
     CacheFrame = 0x7FFFFFFF; // todo find out what this is
-    CacheData = new float[8 * VectorLen];
-    Data = new unsigned int[4 * ((chunk_size / 4) + 1)]; // fix this
+    CacheData = new float[2*VectorLen];
+    Data = new unsigned int[((chunk_size / 4) + 1)]; // fix this
     Data[0] = chan.Data[0];
     if (cload.Read(&Data[1], chunk_size) != chunk_size) {
         Free();
