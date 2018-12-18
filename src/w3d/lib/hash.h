@@ -17,17 +17,20 @@
 
 class HashableClass
 {
+    friend class HashTableClass;
+    friend class HashTableIteratorClass;
 public:
-    HashableClass() : m_nextHash(0) {}
+    HashableClass() : m_nextHash(nullptr) {}
     virtual ~HashableClass() {}
     virtual const char *Get_Key() = 0;
 
-public:
+private:
     HashableClass *m_nextHash;
 };
 
 class HashTableClass
 {
+    friend class HashTableIteratorClass;
 public:
     HashTableClass(int size);
     ~HashTableClass();
@@ -35,9 +38,10 @@ public:
     void Add(HashableClass *entry);
     bool Remove(HashableClass *entry);
     HashableClass *Find(char const *key);
+private:
     int Hash(const char *key);
 
-public:
+private:
     int m_hashTableSize;
     HashableClass **m_hashTable;
 };
@@ -51,10 +55,10 @@ public:
     void Next();
     bool Is_Done() { return m_currentEntry == nullptr; } // i think, based on enb..
     HashableClass *Get_Current() { return m_currentEntry; }
-    HashableClass *Get_Next() { return m_nextEntry; }
+private:
     void Advance_Next();
 
-public:
+private:
     HashTableClass &m_table;
     int m_index;
     HashableClass *m_currentEntry;

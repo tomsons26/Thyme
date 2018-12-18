@@ -2,6 +2,9 @@
 #include "crc.h"
 #include "gamedebug.h"
 
+/**
+ * 0x008A0900
+ */
 HashTableClass::HashTableClass(int size)
 {
     m_hashTableSize = size;
@@ -10,6 +13,9 @@ HashTableClass::HashTableClass(int size)
     Reset();
 }
 
+/**
+ * 0x008A0940
+ */
 HashTableClass::~HashTableClass()
 {
     if (m_hashTable) {
@@ -18,6 +24,11 @@ HashTableClass::~HashTableClass()
     m_hashTable = nullptr;
 }
 
+/**
+ * Reset hash table.
+ *
+ * 0x008A0960
+ */
 void HashTableClass::Reset()
 {
     for (int i = 0; i < m_hashTableSize; ++i) {
@@ -25,6 +36,11 @@ void HashTableClass::Reset()
     }
 }
 
+/**
+ * Add entry to the hash table.
+ *
+ * 0x008A0980
+ */
 void HashTableClass::Add(HashableClass *entry)
 {
     DEBUG_ASSERT(entry != NULL);
@@ -33,10 +49,15 @@ void HashTableClass::Add(HashableClass *entry)
     m_hashTable[hash] = entry;
 }
 
+/**
+ * Remove entry from hash table.
+ *
+ * 0x008A09C0
+ */
 bool HashTableClass::Remove(HashableClass *entry)
 {
     DEBUG_ASSERT(entry != NULL);
-    unsigned int hash = Hash(entry->Get_Key());
+    int hash = Hash(entry->Get_Key());
     if (!m_hashTable[hash]) {
         return false;
     }
@@ -53,7 +74,12 @@ bool HashTableClass::Remove(HashableClass *entry)
     return false;
 }
 
-HashableClass *HashTableClass::Find(char const *key)
+/**
+ * Try finding the hash that matches the specified string.
+ *
+ * 0x008A0A30
+ */
+HashableClass *HashTableClass::Find(const char *key)
 {
     for (HashableClass *i = m_hashTable[Hash(key)]; i; i = i->m_nextHash) {
         if (!stricmp(i->Get_Key(), key)) {
@@ -63,11 +89,19 @@ HashableClass *HashTableClass::Find(char const *key)
     return nullptr;
 }
 
+/**
+ * Generate a checksum from the specified string.
+ */
 int HashTableClass::Hash(const char *key)
 {
     return (m_hashTableSize - 1) & CRC::Stringi(key, 0);
 }
 
+/**
+ *
+ *
+ * 0x008A0A90
+ */
 void HashTableIteratorClass::First()
 {
     m_index = 0;
@@ -76,6 +110,11 @@ void HashTableIteratorClass::First()
     Next();
 }
 
+/**
+ *
+ *
+ * 0x008A0AF0
+ */
 void HashTableIteratorClass::Next()
 {
     m_currentEntry = m_nextEntry;
@@ -85,6 +124,9 @@ void HashTableIteratorClass::Next()
     }
 }
 
+/**
+ *
+ */
 void HashTableIteratorClass::Advance_Next()
 {
     while (!m_nextEntry) {
