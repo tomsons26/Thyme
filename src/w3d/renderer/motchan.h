@@ -62,8 +62,8 @@ public:
     void Free();
     bool Load_W3D(ChunkLoadClass &cload);
     unsigned int Estimate_Size();
-    int Get_Type() { return Type; }
-    int Get_Pivot() { return PivotIdx; }
+    int Get_Type() { return m_type; }
+    int Get_Pivot() { return m_pivotIdx; }
     void Get_Vector(int, float *);
     //not sure if these exist anywhere as code but noting for future
     //void Get_Vector_As_Quat(int, class Quaternion &){};
@@ -71,15 +71,15 @@ public:
     void Do_Data_Compression(int){};//code exists but i don't get how to do it
 
 private:
-    unsigned int PivotIdx;
-    unsigned int Type;
-    int VectorLen;
-    int UnusedFloat1;
-    int UnusedFloat2;
-    short *UnusedBuffer;
-    float *Data;
-    int FirstFrame;
-    int LastFrame;
+    unsigned int m_pivotIdx;
+    unsigned int m_type;
+    int m_vectorLen;
+    int m_unusedFloat1;
+    int m_unusedFloat2;
+    short *m_unusedBuffer;
+    float *m_data;
+    int m_firstFrame;
+    int m_lastFrame;
 };
 
 class BitChannelClass : W3DMPO
@@ -90,18 +90,18 @@ public:
     void Free();
     bool Load_W3D(ChunkLoadClass &cload);
     unsigned int Estimate_Size();
-    int Get_Type() { return Type; }
-    int Get_Pivot() { return PivotIdx; }
+    int Get_Type() { return m_type; }
+    int Get_Pivot() { return m_pivotIdx; }
     //not sure if this exists anywhere as code but noting for future
     int Get_Bit(int frame);
 
 private:
-    unsigned int PivotIdx;
-    unsigned int Type;
-    int DefaultVal;
-    int FirstFrame;
-    int LastFrame;
-    unsigned char *Bits;
+    unsigned int m_pivotIdx;
+    unsigned int m_type;
+    int m_defaultVal;
+    int m_firstFrame;
+    int m_lastFrame;
+    unsigned char *m_bits;
 };
 
 class TimeCodedMotionChannelClass : W3DMPO
@@ -112,8 +112,8 @@ public:
     void Free();
     bool Load_W3D(ChunkLoadClass &cload);
     unsigned int Estimate_Size();
-    int Get_Type() { return Type; }
-    int Get_Pivot() { return PivotIdx; }
+    int Get_Type() { return m_type; }
+    int Get_Pivot() { return m_pivotIdx; }
     void Get_Vector(float frame, float *setvec);
     Quaternion Get_Quat_Vector(float frame_idx);
     void Set_Identity(float *setvec);
@@ -121,14 +121,14 @@ public:
     unsigned int Binary_Search_Index(unsigned int timecode);
 
 private:
-    unsigned int PivotIdx;
-    unsigned int Type;
-    int VectorLen;
-    unsigned int PacketSize;
-    unsigned int NumTimeCodes;
-    unsigned int LastTimeCodeIdx;
-    unsigned int CachedIdx;
-    unsigned int *Data;
+    unsigned int m_pivotIdx;
+    unsigned int m_type;
+    int m_vectorLen;
+    unsigned int m_packetSize;
+    unsigned int m_numTimeCodes;
+    unsigned int m_lastTimeCodeIdx;
+    unsigned int m_cachedIdx;
+    unsigned int *m_data;
 };
 
 class TimeCodedBitChannelClass : W3DMPO
@@ -139,17 +139,17 @@ public:
     void Free();
     bool Load_W3D(ChunkLoadClass &cload);
     unsigned int Estimate_Size();
-    int Get_Type() { return Type; }
-    int Get_Pivot() { return PivotIdx; }
+    int Get_Type() { return m_type; }
+    int Get_Pivot() { return m_pivotIdx; }
     int Get_Bit(int frame);
 
 private:
-    unsigned int PivotIdx;
-    unsigned int Type;
-    int DefaultVal;
-    unsigned int NumTimeCodes;
-    unsigned int CachedIdx;
-    unsigned int *Bits;
+    unsigned int m_pivotIdx;
+    unsigned int m_type;
+    int m_defaultVal;
+    unsigned int m_numTimeCodes;
+    unsigned int m_cachedIdx;
+    unsigned int *m_bits;
 };
 
 class AdaptiveDeltaMotionChannelClass : W3DMPO
@@ -160,8 +160,8 @@ public:
     void Free();
     bool Load_W3D(ChunkLoadClass &cload);
     unsigned int Estimate_Size();
-    int Get_Type() { return Type; }
-    int Get_Pivot() { return PivotIdx; }
+    int Get_Type() { return m_type; }
+    int Get_Pivot() { return m_pivotIdx; }
     void Get_Vector(float frame, float *setvec);
     Quaternion Get_Quat_Vector(float frame_idx);
     float Get_Frame(unsigned int frame_idx, unsigned int vector_idx);
@@ -169,25 +169,25 @@ public:
     void Decompress(unsigned int frame_idx, float *outdata);
 
 private:
-    unsigned int PivotIdx;
-    unsigned int Type;
-    int VectorLen;
-    unsigned int NumFrames;
-    float Scale;
-    unsigned int *Data;
-    unsigned int CacheFrame;
-    float *CacheData;
+    unsigned int m_pivotIdx;
+    unsigned int m_type;
+    int m_vectorLen;
+    unsigned int m_numFrames;
+    float m_scale;
+    unsigned int *m_data;
+    unsigned int m_cacheFrame;
+    float *m_cacheData;
 };
 
 // Following is from BFME2 WB
 struct W3dCompressedMotionChannelStruct
 {
-    char zero; // must be 0 or bails reading
-    char Type;
-    char VectorLen;
-    char Channel;
-    short NumTimeCodes; // union? NumFrames for AD?
-    short Pivot;
+    char m_zero; // must be 0 or bails reading
+    char m_type;
+    char m_vectorLen;
+    char m_channel;
+    short m_numTimeCodes; // union? NumFrames for AD?
+    short m_pivot;
 };
 
 class MotionChannelClassBase
@@ -201,15 +201,15 @@ public:
     virtual void Get_Vector() = 0;
     virtual void Get_Quaternion() = 0;
     virtual unsigned int Estimate_Size() = 0;
-    unsigned int Get_Channel() { return Channel; }
-    unsigned int Get_Pivot() { return PivotIdx; }
+    unsigned int Get_Channel() { return m_channel; }
+    unsigned int Get_Pivot() { return m_pivotIdx; }
     static MotionChannelClassBase *Read_Motion_Channel(ChunkLoadClass &cload);
 
 protected:
-    unsigned int Channel;
-    unsigned int PivotIdx;
-    unsigned int NumTimeCodes;
-    unsigned int VectorLen;
+    unsigned int m_channel;
+    unsigned int m_pivotIdx;
+    unsigned int m_numTimeCodes;
+    unsigned int m_vectorLen;
 };
 
 class MotionChannelTimeCoded : public MotionChannelClassBase
@@ -225,8 +225,8 @@ public:
     virtual unsigned int Estimate_Size() override;
 
 private:
-    short *Data1;
-    unsigned int *Data2;
+    short *m_data1;
+    unsigned int *m_data2;
 };
 
 class MotionChannelAdaptiveDelta : public MotionChannelClassBase
@@ -235,15 +235,15 @@ public:
     MotionChannelAdaptiveDelta();
     virtual bool Load_W3D(ChunkLoadClass &cload) override;
     virtual ~MotionChannelAdaptiveDelta() override{};
-    virtual unsigned int Size() override { return 8 * VectorLen + 4; };
+    virtual unsigned int Size() override { return 8 * m_vectorLen + 4; };
     virtual void Get_Scalar() override{};
     virtual void Get_Vector() override{};
     virtual void Get_Quaternion() override{};
 
 protected:
-    float Scale;
-    float floats[4]; // dunno
-    unsigned int *Data;
+    float m_scale;
+    float m_floats[4]; // dunno
+    unsigned int *m_data;
 };
 
 class MotionChannelAdaptiveDelta4 : public MotionChannelAdaptiveDelta
