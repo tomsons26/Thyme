@@ -3,72 +3,12 @@
 #include "gamemath.h"
 
 // clang-format off
-static float filtertable[] =
+static float filtertable[256] =
 {
 	1.0e-08f, 1.0e-07f, 1.0e-06f, 1.0e-05f,
 		0.0001f, 0.001f, 0.01f, 0.1f,
 		1.0f, 10.0f, 100.0f, 1000.0f,
-		10000.0f, 100000.0f, 1000000.0f, 10000000.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f
+		10000.0f, 100000.0f, 1000000.0f, 10000000.0f
 };
 // clang-format on
 
@@ -98,6 +38,7 @@ void MotionChannelClass::Free()
         delete[] UnusedBuffer;
         UnusedBuffer = nullptr;
     }
+
     if (Data) {
         delete[] Data;
         Data = nullptr;
@@ -112,22 +53,26 @@ bool MotionChannelClass::Load_W3D(ChunkLoadClass &cload)
     if (cload.Read(&chan, sizeof(chan)) != sizeof(chan)) {
         return false;
     }
-    FirstFrame = chan.FirstFrame;
-    LastFrame = chan.LastFrame;
-    VectorLen = chan.VectorLen;
-    Type = chan.Flags;
-    PivotIdx = chan.Pivot;
+
+    FirstFrame = chan.first_frame;
+    LastFrame = chan.last_frame;
+    VectorLen = chan.vector_len;
+    Type = chan.flags;
+    PivotIdx = chan.pivot;
     unsigned int bytes = 4 * VectorLen * (LastFrame - FirstFrame + 1);
     unsigned int bytesleft = bytes - 4;
     Data = new float[bytes];
-    Data[0] = chan.Data[0];
+    Data[0] = chan.data[0];
+
     if (cload.Read(&Data[1], bytesleft) != bytesleft) {
         Free();
         return false;
     }
+
     if (chunk_size != bytesleft) {
         cload.Seek(chunk_size - bytesleft);
     }
+
     // Do_Data_Compression(bytesleft);
     return true;
 }
@@ -145,10 +90,10 @@ void MotionChannelClass::Get_Vector(int a2, float *a3)
         Set_Identity(a3);
     } else {
         int v3 = a2 - FirstFrame;
+
         if (Data) {
             for (int i = 0; i < VectorLen; ++i) {
                 a3[i] = Data[i + VectorLen * v3];
-                ;
             }
         } else {
             long double v5 = UnusedFloat2 / 65535.0;
@@ -193,11 +138,11 @@ bool BitChannelClass::Load_W3D(ChunkLoadClass &cload)
     if (cload.Read(&chan, sizeof(chan)) != sizeof(chan)) {
         return false;
     }
-    FirstFrame = chan.FirstFrame;
-    LastFrame = chan.LastFrame;
-    Type = chan.Flags;
-    PivotIdx = chan.Pivot;
-    DefaultVal = chan.DefaultVal;
+    FirstFrame = chan.first_frame;
+    LastFrame = chan.last_frame;
+    Type = chan.flags;
+    PivotIdx = chan.pivot;
+    DefaultVal = chan.default_val;
     // need to clean this up
     unsigned int bytes = ((LastFrame - FirstFrame + 1) + 7) / 8;
     unsigned int bytesleft = bytes - 1;
@@ -205,11 +150,13 @@ bool BitChannelClass::Load_W3D(ChunkLoadClass &cload)
     Bits = new unsigned char[bytes];
     //
     DEBUG_ASSERT(Bits);
-    Bits[0] = chan.Data[0];
+    Bits[0] = chan.data[0];
+
     if (bytesleft && cload.Read(&Bits[1], bytesleft) != bytesleft) {
         Free();
         return false;
     }
+
     return true;
 }
 
@@ -224,6 +171,7 @@ int BitChannelClass::Get_Bit(int frame)
     if (frame < FirstFrame || frame > LastFrame) {
         return DefaultVal;
     }
+
     return ((1 * ((frame - LOBYTE(FirstFrame)) & 7)) & Bits[(frame - FirstFrame) / 8]) != 0;
 }
 
@@ -256,19 +204,22 @@ bool TimeCodedMotionChannelClass::Load_W3D(ChunkLoadClass &cload)
     if (cload.Read(&chan, sizeof(chan)) != sizeof(chan)) {
         return false;
     }
-    NumTimeCodes = chan.NumTimeCodes;
-    VectorLen = chan.VectorLen;
-    Type = chan.Flags;
-    PivotIdx = chan.Pivot;
+
+    NumTimeCodes = chan.num_timecodes;
+    VectorLen = chan.vector_len;
+    Type = chan.flags;
+    PivotIdx = chan.pivot;
     PacketSize = VectorLen + 1;
     CachedIdx = 0;
     LastTimeCodeIdx = PacketSize * (NumTimeCodes - 1);
     Data = new unsigned int[((chunk_size / 4) + 1)];
-    Data[0] = chan.Data[0];
+    Data[0] = chan.data[0];
+
     if (cload.Read(&Data[1], chunk_size) != chunk_size) {
         Free();
         return false;
     }
+
     return true;
 }
 
@@ -289,6 +240,7 @@ void TimeCodedMotionChannelClass::Get_Vector(float frame, float *setvec)
     } else {
         int index2 = PacketSize + index;
         unsigned int val = Data[index2];
+
         if (GameMath::Fast_Is_Float_Positive(val)) {
             float v8 = (Data[index] & 0x7FFFFFFF);
             float *data1 = (float *)&Data[index + 1];
@@ -300,9 +252,11 @@ void TimeCodedMotionChannelClass::Get_Vector(float frame, float *setvec)
             }
         } else {
             float *data3 = (float *)&Data[index + 1];
+
             for (int j = 0; j < VectorLen; ++j) {
                 setvec[j] = data3[j];
             }
+
         }
     }
 }
@@ -359,16 +313,20 @@ unsigned int TimeCodedMotionChannelClass::Get_Index(unsigned int timecode)
     if (timecode < (Data[CachedIdx] & 0x7FFFFFFF)) {
         goto LABEL_15;
     }
+
     if (CachedIdx == LastTimeCodeIdx) {
         return CachedIdx;
     }
+
     if (timecode < (Data[PacketSize + CachedIdx] & 0x7FFFFFFF)) {
         return CachedIdx;
     }
+
     CachedIdx += PacketSize;
     if (CachedIdx == LastTimeCodeIdx) {
         return CachedIdx;
     }
+
     if (timecode >= (Data[PacketSize + CachedIdx] & 0x7FFFFFFF)) {
     LABEL_15:
         CachedIdx = Binary_Search_Index(timecode);
@@ -376,6 +334,7 @@ unsigned int TimeCodedMotionChannelClass::Get_Index(unsigned int timecode)
     } else {
         result = CachedIdx;
     }
+
     return result;
 }
 
@@ -441,16 +400,18 @@ bool TimeCodedBitChannelClass::Load_W3D(ChunkLoadClass &cload)
     if (cload.Read(&chan, sizeof(chan)) != sizeof(chan)) {
         return false;
     }
-    NumTimeCodes = chan.NumTimeCodes;
-    Type = chan.Flags;
-    PivotIdx = chan.Pivot;
-    DefaultVal = chan.DefaultVal;
+
+    NumTimeCodes = chan.num_timecodes;
+    Type = chan.flags;
+    PivotIdx = chan.pivot;
+    DefaultVal = chan.default_val;
     CachedIdx = 0;
     int bytesleft = 4 * NumTimeCodes - 4;
     DEBUG_ASSERT((sizeof(chan) + bytesleft) == (unsigned)chunk_size);
     Bits = new unsigned int[NumTimeCodes];
     DEBUG_ASSERT(Bits);
-    Bits[0] = chan.Data[0];
+    Bits[0] = chan.data[0];
+
     if (bytesleft && cload.Read(&Bits[1], bytesleft) != bytesleft) {
         Free();
         return false;
@@ -470,16 +431,20 @@ int TimeCodedBitChannelClass::Get_Bit(int frame)
     DEBUG_ASSERT(frame >= 0);
     DEBUG_ASSERT(CachedIdx < NumTimeCodes);
     unsigned int count = 0;
+
     if (frame >= (Bits[CachedIdx] & 0x7FFFFFFF)) {
         count = CachedIdx + 1;
     }
+
     while (count < NumTimeCodes && frame >= (Bits[count] & 0x7FFFFFFF)) {
         ++count;
     }
+
     int index = count - 1;
     if (index < 0) {
         index = 0;
     }
+
     CachedIdx = index;
     return (Bits[index] & 0x80000000) == 0x80000000;
 }
@@ -523,22 +488,26 @@ bool AdaptiveDeltaMotionChannelClass::Load_W3D(ChunkLoadClass &cload)
 {
     W3dAdaptiveDeltaAnimChannelStruct chan;
     unsigned int chunk_size = cload.Cur_Chunk_Length() - sizeof(chan);
+
     if (cload.Read(&chan, sizeof(chan)) != sizeof(chan)) {
         return false;
     }
-    VectorLen = chan.VectorLen;
-    Type = chan.Flags;
-    PivotIdx = chan.Pivot;
-    NumFrames = chan.NumFrames;
-    Scale = chan.Scale;
+
+    VectorLen = chan.vector_len;
+    Type = chan.flags;
+    PivotIdx = chan.pivot;
+    NumFrames = chan.num_frames;
+    Scale = chan.scale;
     CacheFrame = 0x7FFFFFFF; // todo find out what this is
     CacheData = new float[2*VectorLen];
     Data = new unsigned int[((chunk_size / 4) + 1)]; // fix this
-    Data[0] = chan.Data[0];
+    Data[0] = chan.data[0];
+
     if (cload.Read(&Data[1], chunk_size) != chunk_size) {
         Free();
         return false;
     }
+
     return true;
 }
 
@@ -582,38 +551,40 @@ Quaternion AdaptiveDeltaMotionChannelClass::Get_Quat_Vector(float frame_idx)
 
 float AdaptiveDeltaMotionChannelClass::Get_Frame(unsigned int frame_idx, unsigned int vector_idx)
 {
-    double result;
     float Dst[4];
 
     if (frame_idx >= NumFrames) {
         frame_idx = NumFrames - 1;
     }
     if (CacheFrame == frame_idx) {
-        result = CacheData[vector_idx];
+        return CacheData[vector_idx];
     } else if (CacheFrame + 1 == frame_idx) {
-        result = CacheData[VectorLen + vector_idx];
+        return CacheData[VectorLen + vector_idx];
     } else if (frame_idx < CacheFrame) {
         Decompress(frame_idx, CacheData);
+
         if (frame_idx != NumFrames - 1) {
             Decompress(frame_idx, CacheData, frame_idx + 1, &CacheData[VectorLen]);
         }
+
         CacheFrame = frame_idx;
-        result = CacheData[vector_idx];
+        return CacheData[vector_idx];
     } else if (frame_idx == CacheFrame + 2) {
         memcpy(CacheData, &CacheData[VectorLen], 4 * VectorLen);
         Decompress(++CacheFrame, CacheData, frame_idx, &CacheData[VectorLen]);
-        result = CacheData[vector_idx + VectorLen];
+        return CacheData[vector_idx + VectorLen];
     } else {
         DEBUG_ASSERT(VectorLen <= 4);
         memcpy(Dst, &CacheData[VectorLen], 4 * VectorLen);
         Decompress(CacheFrame, Dst, frame_idx, CacheData);
         CacheFrame = frame_idx;
+
         if (frame_idx != NumFrames - 1) {
             Decompress(CacheFrame, CacheData, frame_idx + 1, &CacheData[VectorLen]);
         }
-        result = CacheData[vector_idx];
+
+        return CacheData[vector_idx];
     }
-    return result;
 }
 
 void AdaptiveDeltaMotionChannelClass::Decompress(
@@ -625,6 +596,7 @@ void AdaptiveDeltaMotionChannelClass::Decompress(
     unsigned int src_idxa = src_idx + 1;
     float *base = (float *)&Data[VectorLen];
     bool done = 0;
+
     for (int i = 0; i < VectorLen; ++i) {
         float *v14 = (float *)((char *)base + 9 * i + ((src_idxa - 1) >> 4) * 9 * VectorLen);
         int v13 = ((char)src_idxa - 1) & 0xF;
@@ -670,6 +642,7 @@ void AdaptiveDeltaMotionChannelClass::Decompress(unsigned int frame_idx, float *
 
     float *srcdata = (float *)Data;
     bool done = 0;
+
     for (int i = 0; i < VectorLen; ++i) {
         float *v12 = (float *)((char *)Data + 9 * i + 4 * VectorLen);
         float v11 = srcdata[i];
@@ -711,11 +684,13 @@ MotionChannelClassBase::MotionChannelClassBase() : Channel(-1), PivotIdx(-1) {}
 MotionChannelClassBase *MotionChannelClassBase::Read_Motion_Channel(ChunkLoadClass &cload)
 {
     W3dCompressedMotionChannelStruct chan;
+
     if (cload.Read(&chan, sizeof(chan)) != sizeof(chan)) {
         return nullptr;
     } else if (chan.zero != 0) {
         return nullptr;
     }
+
     MotionChannelClassBase *motchan;
     switch (chan.Type) {
         case 0:
@@ -730,6 +705,7 @@ MotionChannelClassBase *MotionChannelClassBase::Read_Motion_Channel(ChunkLoadCla
         default:
             return nullptr;
     }
+
     if (motchan) {
         motchan->Channel = chan.Channel;
         motchan->PivotIdx = chan.Pivot;
@@ -740,6 +716,7 @@ MotionChannelClassBase *MotionChannelClassBase::Read_Motion_Channel(ChunkLoadCla
         }
         return motchan;
     }
+
     return nullptr;
 }
 
@@ -751,15 +728,19 @@ bool MotionChannelTimeCoded::Load_W3D(ChunkLoadClass &cload)
     unsigned int size2 = 4 * VectorLen * NumTimeCodes;
     Data1 = new short[size1];
     Data2 = new unsigned int[size2];
+
     if (cload.Read(Data1, size1) != size1) {
         return false;
     }
+
     if (NumTimeCodes & 1) {
         cload.Seek(sizeof(short));
     }
+
     if (cload.Read(Data1, size2) != size2) {
         return false;
     }
+
     return true;
 }
 
@@ -773,17 +754,22 @@ MotionChannelAdaptiveDelta::MotionChannelAdaptiveDelta() : MotionChannelClassBas
 bool MotionChannelAdaptiveDelta::Load_W3D(ChunkLoadClass &cload)
 {
     DEBUG_ASSERT(VectorLen <= 4);
+
     if (cload.Read(&Scale, sizeof(Scale)) != sizeof(Scale)) {
         return false;
     }
+
     if (cload.Read(floats, 4 * VectorLen) != 4 * VectorLen) {
         return false;
     }
+
     unsigned int size = cload.Cur_Chunk_Length() - 12 - 4 * VectorLen;
     Data = new unsigned int[size];
+
     if (cload.Read(Data, size) != size) {
         return false;
     }
+
     return true;
 }
 

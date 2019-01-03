@@ -7,51 +7,51 @@
 // to move
 struct W3dAnimChannelStruct
 {
-    unsigned short FirstFrame;
-    unsigned short LastFrame;
-    unsigned short VectorLen;
-    unsigned short Flags;
-    unsigned short Pivot;
+    unsigned short first_frame;
+    unsigned short last_frame;
+    unsigned short vector_len;
+    unsigned short flags;
+    unsigned short pivot;
     unsigned short pad;
-    float Data[1];
+    float data[1];
 };
 
 struct W3dBitChannelStruct
 {
-    unsigned short FirstFrame;
-    unsigned short LastFrame;
-    unsigned short Flags;
-    unsigned short Pivot;
-    unsigned int DefaultVal;
-    unsigned int Data[1];
+    unsigned short first_frame;
+    unsigned short last_frame;
+    unsigned short flags;
+    unsigned short pivot;
+    unsigned int default_val;
+    unsigned int data[1];
 };
 
 struct W3dTimeCodedAnimChannelStruct
 {
-    unsigned int NumTimeCodes;
-    unsigned short Pivot;
-    unsigned char VectorLen;
-    unsigned char Flags;
-    unsigned int Data[1];
+    unsigned int num_timecodes;
+    unsigned short pivot;
+    unsigned char vector_len;
+    unsigned char flags;
+    unsigned int data[1];
 };
 
 struct W3dTimeCodedBitChannelStruct
 {
-    unsigned int NumTimeCodes;
-    unsigned short Pivot;
-    unsigned char Flags;
-    unsigned char DefaultVal;
-    unsigned int Data[1];
+    unsigned int num_timecodes;
+    unsigned short pivot;
+    unsigned char flags;
+    unsigned char default_val;
+    unsigned int data[1];
 };
 
 struct W3dAdaptiveDeltaAnimChannelStruct
 {
-    unsigned int NumFrames;
-    unsigned short Pivot;
-    unsigned char VectorLen;
-    unsigned char Flags;
-    float Scale;
-    unsigned int Data[1];
+    unsigned int num_frames;
+    unsigned short pivot;
+    unsigned char vector_len;
+    unsigned char flags;
+    float scale;
+    unsigned int data[1];
 };
 
 class MotionChannelClass : W3DMPO

@@ -13,12 +13,17 @@ class MissingAnimClass : public HashableClass
 public:
     MissingAnimClass(const char *name) : Name(name) {}
     MissingAnimClass(MissingAnimClass &){}; // unknown if it just sets name or hash table too
-    virtual ~MissingAnimClass() { m_name.Free_String(); };
+    virtual ~MissingAnimClass() {};
     virtual const char *Get_Key() override { return m_name.Peek_Buffer(); };
 
 private:
     StringClass m_name;
 };
+
+//afaict these are the same as the one above..
+typedef MissingGeoClass MissingAnimClass;
+typedef MissingTextureClass MissingAnimClass;
+
 
 class HAnimManagerClass
 {
