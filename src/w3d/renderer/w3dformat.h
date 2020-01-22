@@ -116,6 +116,51 @@ inline void Color_To_Format(uint8_t *dst, uint32_t color, WW3DFormat format)
     }
 }
 
+inline int Alpha_Bits(WW3DFormat format)
+{
+    switch ( format )
+    {
+        case WW3D_FORMAT_A8R8G8B8:
+        case WW3D_FORMAT_A8:
+        case WW3D_FORMAT_A8R3G3B2:
+        case WW3D_FORMAT_A8P8:
+        case WW3D_FORMAT_A8L8:
+            return 8;
+        case WW3D_FORMAT_A4R4G4B4:
+        case WW3D_FORMAT_A4L4:
+        case WW3D_FORMAT_DXT3:
+        case WW3D_FORMAT_DXT4:
+        case WW3D_FORMAT_DXT5:
+            return 4;
+        case WW3D_FORMAT_A1R5G5B5:
+        case WW3D_FORMAT_DXT2:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+inline bool Has_Alpha(WW3DFormat format)
+{
+    switch ( format ) {
+        case WW3D_FORMAT_A8R8G8B8:
+        case WW3D_FORMAT_A1R5G5B5:
+        case WW3D_FORMAT_A4R4G4B4:
+        case WW3D_FORMAT_A8:
+        case WW3D_FORMAT_A8R3G3B2:
+        case WW3D_FORMAT_A8P8:
+        case WW3D_FORMAT_A8L8:
+        case WW3D_FORMAT_A4L4:
+        case WW3D_FORMAT_DXT2:
+        case WW3D_FORMAT_DXT3:
+        case WW3D_FORMAT_DXT4:
+        case WW3D_FORMAT_DXT5:
+            return true;
+        default:
+            return false;
+    }
+}
+
 #ifdef GAME_DLL
 #include "hooker.h"
 extern ARRAY_DEC(WW3DFormat, g_D3DFormatToWW3DFormatConversionArray, 63);
