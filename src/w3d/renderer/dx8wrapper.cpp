@@ -247,6 +247,15 @@ w3dtexture_t DX8Wrapper::Create_Texture(
 #endif
 }
 
+w3dtexture_t DX8Wrapper::Create_Texture(IDirect3DSurface8 *surface, MipCountType mip_level_count)
+{
+#ifdef GAME_DLL
+    return Call_Function<w3dtexture_t, IDirect3DSurface8 *, MipCountType>(PICK_ADDRESS(0x0, 0x004FE200), surface, mip_level_count);
+#else
+    return w3dtexture_t();
+#endif
+}
+
 w3dsurface_t DX8Wrapper::Create_Surface(unsigned width, unsigned height, WW3DFormat format)
 {
 #ifdef BUILD_WITH_D3D8

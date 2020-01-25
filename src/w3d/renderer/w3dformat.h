@@ -171,6 +171,18 @@ inline uint8_t Alpha_Bits(WW3DFormat format)
     return 0;
 }
 
+inline bool Is_Compressed(WW3DFormat format)
+{
+    switch (format) {
+        case WW3D_FORMAT_DXT1:
+        case WW3D_FORMAT_DXT2:
+        case WW3D_FORMAT_DXT3:
+        case WW3D_FORMAT_DXT4:
+        case WW3D_FORMAT_DXT5:
+            return true;
+    }
+    return false;
+}
 
 #ifdef GAME_DLL
 #include "hooker.h"

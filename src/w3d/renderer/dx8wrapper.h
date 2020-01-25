@@ -136,6 +136,7 @@ public:
     static void Get_Device_Resolution(int &width, int &height, int &bit_depth, bool &windowed);
     static w3dtexture_t Create_Texture(
         unsigned width, unsigned height, WW3DFormat format, MipCountType mip_level_count, w3dpool_t pool, bool rendertarget);
+    static w3dtexture_t Create_Texture(IDirect3DSurface8 *surface, MipCountType mip_level_count);
     static w3dsurface_t Create_Surface(unsigned width, unsigned height, WW3DFormat format);
     static w3dsurface_t Create_Surface(const char *name);
 

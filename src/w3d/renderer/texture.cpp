@@ -14,16 +14,22 @@
  *            LICENSE
  */
 #include "texture.h"
+#include "d3d8.h"
+#include "dx8texman.h"
 #include "dx8wrapper.h"
+#include "textureloader.h"
+#include "w3d.h"
+#include <algorithm>
+#include <cstring>
 
 static unsigned g_minTextureFilters[MAX_TEXTURE_STAGES][TextureFilterClass::FILTER_TYPE_COUNT];
 static unsigned g_magTextureFilters[MAX_TEXTURE_STAGES][TextureFilterClass::FILTER_TYPE_COUNT];
 static unsigned g_mipMapFilters[MAX_TEXTURE_STAGES][TextureFilterClass::FILTER_TYPE_COUNT];
 
-TextureFilterClass::TextureFilterClass(MipCountType mip_count) :
+TextureFilterClass::TextureFilterClass(MipCountType mip_level_count) :
     m_minTextureFilter(FILTER_TYPE_DEFAULT),
     m_magTextureFilter(FILTER_TYPE_DEFAULT),
-    m_mipMapFilter(mip_count == MIP_LEVELS_1 ? FILTER_TYPE_NONE : FILTER_TYPE_DEFAULT),
+    m_mipMapFilter(mip_level_count == MIP_LEVELS_1 ? FILTER_TYPE_NONE : FILTER_TYPE_DEFAULT),
     m_uAddressMode(TEXTURE_ADDRESS_REPEAT),
     m_vAddressMode(TEXTURE_ADDRESS_REPEAT)
 {
@@ -155,3 +161,280 @@ void TextureFilterClass::Set_Default_Mip_Filter(FilterType type)
         g_mipMapFilters[i][FILTER_TYPE_DEFAULT] = g_mipMapFilters[i][type];
     }
 }
+
+// done
+TextureClass::TextureClass(unsigned width, unsigned height, WW3DFormat format, MipCountType mip_count, PoolType pool,
+    bool render_target, bool allow_reduction) :
+    TextureBaseClass(width, height, mip_count, pool, render_target, allow_reduction),
+    m_textureFormat(format),
+    m_textureFilter(mip_count)
+{
+    m_initialized = true;
+    m_isProcedural = true;
+    m_allowReduction = false;
+
+    if (Is_Compressed(format)) {
+        m_compressionAllowed = true;
+    }
+    switch (pool) {
+        case POOL_DEFAULT:
+            m_d3dTexture = DX8Wrapper::Create_Texture(width, height, format, mip_count, D3DPOOL_DEFAULT, render_target);
+            break;
+        case POOL_MANAGED:
+            m_d3dTexture = DX8Wrapper::Create_Texture(width, height, format, mip_count, D3DPOOL_MANAGED, render_target);
+            break;
+        case POOL_SYSTEMMEM:
+            m_d3dTexture = DX8Wrapper::Create_Texture(width, height, format, mip_count, D3DPOOL_SYSTEMMEM, render_target);
+            break;
+        default:
+            // DEBUG_LOG("0"); need to log that unsupported pool was attempted to be used
+            m_d3dTexture = DX8Wrapper::Create_Texture(width, height, format, mip_count, D3DPOOL_DEFAULT, render_target);
+            break;
+    }
+
+    if (pool == POOL_DEFAULT) {
+        // assert(m_pool == POOL_DEFAULT);
+        m_dirty = true;
+        DX8TextureManagerClass::Add(new DX8TextureTrackerClass(width, height, mip_count, this, format, render_target));
+    }
+
+    m_lastAccess = W3D::Get_Sync_Time();
+}
+
+TextureClass::TextureClass(char const *name, char const *full_path, MipCountType mip_level_count, WW3DFormat format,
+    bool allow_compression, bool allow_reduction) :
+    TextureBaseClass(0, 0, mip_level_count, POOL_MANAGED, false, true),
+    m_textureFormat(format),
+    m_textureFilter(mip_level_count)
+{
+    m_compressionAllowed = allow_compression;
+    m_inactivationTime = 20000;
+    m_allowReduction = allow_reduction;
+
+    Set_Texture_Name(name);
+
+    // if ( !W3D::IsTexturingEnabled )
+    {
+        m_initialized = false;
+        m_d3dTexture = nullptr;
+    }
+
+    m_lastAccess = W3D::Get_Sync_Time();
+    // if (W3D::ThumbnailEnabled)
+    {
+        if (TextureLoader::Is_DX8_Thread()) {
+            TextureClass::Init();
+        }
+    }
+}
+
+// done
+TextureClass::TextureClass(SurfaceClass *surface, MipCountType mip_level_count) :
+    TextureBaseClass(0, 0, mip_level_count, POOL_MANAGED, false, true),
+    m_textureFormat(surface->Get_Surface_Format()),
+    m_textureFilter(mip_level_count)
+{
+    SurfaceClass::SurfaceDescription sd;
+
+    m_isProcedural = true;
+    m_initialized = true;
+    m_allowReduction = false;
+
+    surface->Get_Description(sd);
+    m_width = sd.width;
+    m_height = sd.height;
+
+    if (Is_Compressed(sd.format)) {
+        m_compressionAllowed = true;
+    }
+
+    m_d3dTexture = DX8Wrapper::Create_Texture(surface->Peek_D3D_Surface(), mip_level_count);
+    m_lastAccess = W3D::Get_Sync_Time();
+}
+
+// done
+TextureClass::TextureClass(IDirect3DBaseTexture8 *d3d_texture) :
+    TextureBaseClass(0, 0, (MipCountType)d3d_texture->GetLevelCount(), POOL_DEFAULT, true, true),
+    m_textureFilter((MipCountType)d3d_texture->GetLevelCount())
+{
+    m_initialized = true;
+    m_isProcedural = true;
+    m_allowReduction = false;
+    Set_Platform_Base_Texture(d3d_texture);
+
+    IDirect3DSurface8 *surf = nullptr;
+    reinterpret_cast<IDirect3DTexture8 *>(Peek_Platform_Base_Texture())->GetSurfaceLevel(0, &surf);
+    // v9 = v8->lpVtbl->GetSurfaceLevel(v8, 0, &d3d_texture);
+    // if ( v9 )
+    //{
+    //    Log_DX8_ErrorCode(v9);
+    //}
+
+    D3DSURFACE_DESC desc;
+    memset(&desc, 0, sizeof(desc));
+
+    surf->GetDesc(&desc);
+    // v8 = (*(*d3d_texture + offsetof(IDirect3DSurface8Vtbl, GetDesc)))(d3d_texture, &desc);
+    // if ( v8 )
+    //{
+    //    Log_DX8_ErrorCode(v8);
+    //}
+    m_width = desc.Width;
+    m_height = desc.Height;
+    WW3DFormat format = D3DFormat_To_WW3DFormat(desc.Format);
+    m_textureFormat = format;
+
+    if (Is_Compressed(format)) {
+        m_compressionAllowed = true;
+    }
+    m_lastAccess = W3D::Get_Sync_Time();
+}
+
+// done
+void TextureClass::Init()
+{
+    if (!m_initialized) {
+        unsigned int inact = m_inactivationTime;
+        if (inact) {
+            unsigned int start = m_startTime;
+            if (start) {
+                if (W3D::Get_Sync_Time() - start < inact) {
+                    m_someTimeVal = 3 * inact;
+                }
+                m_startTime = 0;
+            }
+        }
+        if (TextureBaseClass::Peek_Platform_Base_Texture() == nullptr) {
+            if (/*W3D::ThumbnailEnabled && */ m_mipLevelCount != 1) {
+                WW3DFormat format = m_textureFormat;
+                Load_Locked_Surface();
+                m_textureFormat = format;
+            } else {
+                TextureLoader::Request_Foreground_Loading(this);
+            }
+        }
+        if (!m_initialized) {
+            TextureLoader::Request_Background_Loading(this);
+        }
+        m_lastAccess = W3D::Get_Sync_Time();
+    }
+}
+
+// done
+void TextureClass::Apply_New_Surface(w3dbasetexture_t d3d_texture, bool initialized, bool reset)
+{
+    if (Peek_Platform_Base_Texture() != nullptr) {
+        Peek_Platform_Base_Texture()->Release();
+    }
+    m_d3dTexture = d3d_texture;
+    d3d_texture->AddRef();
+    if (initialized) {
+        m_initialized = true;
+    }
+    if (reset) {
+        m_inactivationTime = 0;
+    }
+    // assert(d3d_texture);
+    IDirect3DSurface8 *surf = nullptr;
+    reinterpret_cast<IDirect3DTexture8 *>(Peek_Platform_Base_Texture())->GetSurfaceLevel(0, &surf);
+    // v7 = reinterpret_cast<IDirect3DTexture8 *>(Peek_Platform_Base_Texture())->GetSurfaceLevel(0, &surf);
+    // if ( v7 )
+    //{
+    //    Log_DX8_ErrorCode(v7);
+    //}
+
+    D3DSURFACE_DESC desc;
+    // memset(&desc, 0, sizeof(desc));
+    surf->GetDesc(&desc);
+    // v8 = surf->GetDesc(&desc);
+    // if ( v8 )
+    //{
+    //    Log_DX8_ErrorCode(v8);
+    //}
+    if (initialized) {
+        m_textureFormat = D3DFormat_To_WW3DFormat(desc.Format);
+        m_width = desc.Width;
+        m_height = desc.Height;
+    }
+    surf->Release();
+}
+
+//done?
+void TextureClass::Apply(unsigned stage)
+{
+    if (!m_initialized) {
+        Init();
+    }
+    m_lastAccess = W3D::Get_Sync_Time();
+    // Debug_Statistics::Record_Texture();
+    if (/*WW3D::IsTexturingEnabled*/1)
+    {
+        //DX8Wrapper::Set_DX8_Texture(stage, Peek_Platform_Base_Texture());
+    } else {
+        //DX8Wrapper::Set_DX8_Texture(stage, NULL);
+    }
+
+    m_textureFilter.Apply(stage);
+    
+}
+
+// done
+SurfaceClass *TextureClass::Get_Surface_Level(unsigned int level)
+{
+    IDirect3DSurface8 *d3d_surface = Get_D3D_Surface_Level(level);
+    SurfaceClass *surface = nullptr;
+    surface = new SurfaceClass(d3d_surface);
+    d3d_surface->Release();
+    return surface;
+}
+
+// done
+IDirect3DSurface8 *TextureClass::Get_D3D_Surface_Level(unsigned int level)
+{
+    if (Peek_Platform_Base_Texture() == nullptr) {
+        // debug crash ("Get_D3D_Surface_Level: D3DTexture is NULL!");
+        return nullptr;
+    }
+    IDirect3DSurface8 *surf = nullptr;
+    reinterpret_cast<IDirect3DTexture8 *>(Peek_Platform_Base_Texture())->GetSurfaceLevel(level, &surf);
+    // v5 = v4->lpVtbl->GetSurfaceLevel(v4, level, &surf);
+    // if ( v5 )
+    //{
+    //    Log_DX8_ErrorCode(v5);
+    //}
+    return surf;
+}
+
+// done
+unsigned int TextureClass::Get_Texture_Memory_Usage()
+{
+    int usage = 0;
+
+    if (Peek_Platform_Base_Texture() == nullptr) {
+        return usage;
+    }
+
+    int count = reinterpret_cast<IDirect3DTexture8 *>(Peek_Platform_Base_Texture())->GetLevelCount();
+    if (count != 0) {
+        for (int i = 0; i < count; ++i) {
+            D3DSURFACE_DESC desc;
+            reinterpret_cast<IDirect3DTexture8 *>(Peek_Platform_Base_Texture())->GetLevelDesc(i, &desc);
+            // v7 = v6->lpVtbl->GetLevelDesc(v6, v4, &desc);
+            // if ( v7 )
+            //{
+            //    Log_DX8_ErrorCode(v7);
+            //}
+            usage += desc.Size;
+        }
+    }
+    return usage;
+}
+
+//_Get_Total_Locked_Surface_Size
+//_Get_Total_Texture_Size
+//_Get_Total_Lightmap_Texture_Size
+//_Get_Total_Procedural_Texture_Size
+//_Get_Total_Texture_Count
+//_Get_Total_Lightmap_Texture_Count
+//_Get_Total_Procedural_Texture_Count
+//_Get_Total_Locked_Surface_Count

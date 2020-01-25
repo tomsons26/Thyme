@@ -16,6 +16,7 @@
 #pragma once
 
 #include "always.h"
+#include "surfaceclass.h"
 #include "texturebase.h"
 #include "w3dformat.h"
 #include <new>
@@ -49,19 +50,19 @@ public:
     };
 
 public:
-    TextureFilterClass(MipCountType mip_count);
+    TextureFilterClass(MipCountType mip_level_count);
     void Apply(unsigned stage);
     void Set_Mip_Mapping(FilterType type) { m_mipMapFilter = type; }
     void Set_Min_Filter(FilterType type) { m_minTextureFilter = type; }
     void Set_Mag_Filter(FilterType type) { m_magTextureFilter = type; }
-    void Set_Default_Min_Filter(FilterType type); 
+    void Set_Default_Min_Filter(FilterType type);
     void Set_Default_Mag_Filter(FilterType type);
     void Set_Default_Mip_Filter(FilterType type);
 
     static void Init_Filters(TextureFilterMode mode);
 
 #ifdef GAME_DLL
-    TextureFilterClass *Hook_Ctor(MipCountType mip_count) { return new (this) TextureFilterClass(mip_count); }
+    TextureFilterClass *Hook_Ctor(MipCountType mip_level_count) { return new (this) TextureFilterClass(mip_level_count); }
 #endif
 
 private:
@@ -72,10 +73,25 @@ private:
     TxtAddrMode m_vAddressMode;
 };
 
-class TextureClass final : public TextureBaseClass
+class TextureClass : public TextureBaseClass
 {
 public:
-    // TODO
+    TextureClass(unsigned width, unsigned height, WW3DFormat format, MipCountType mip_level_count, PoolType pool,
+        bool render_target, bool allow_reduction);
+    TextureClass(char const *name, char const *full_path, MipCountType mip_level_count, WW3DFormat format,
+        bool allow_compression, bool allow_reduction);
+    TextureClass(SurfaceClass *surface, MipCountType mip_level_count);
+    TextureClass(IDirect3DBaseTexture8 *d3d_texture);
+
+    virtual int Get_Asset_Type() override { return 0; }
+    SurfaceClass *Get_Surface_Level(unsigned int level);
+    IDirect3DSurface8 *Get_D3D_Surface_Level(unsigned int level);
+    virtual unsigned int Get_Texture_Memory_Usage() override;
+    virtual void Init() override;
+    virtual void Apply_New_Surface(w3dbasetexture_t d3d_texture, bool initialized, bool reset) override;
+    virtual void Apply(unsigned stage) override;
+    virtual TextureClass *As_Texture() override { return this; }
+
     WW3DFormat Texture_Format() const { return m_textureFormat; }
 
 private:
