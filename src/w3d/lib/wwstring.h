@@ -55,6 +55,7 @@ public:
     const char &operator[](int index) const { return m_buffer[index]; }
     char &operator[](int index) { return m_buffer[index]; }
     operator const char *() const { return m_buffer; }
+    operator char *() const { return m_buffer; }
 
     int Compare(const char *string) const { return strcmp(m_buffer, string); }
     int Compare_No_Case(const char *string) const { return strcasecmp(m_buffer, string); }

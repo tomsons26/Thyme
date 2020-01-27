@@ -27,6 +27,8 @@ set(GAMEENGINE_INCLUDES
     w3d/lib
     w3d/math
     w3d/renderer
+    w3d/renderer/w3dshader
+    w3d/saveload
 )
 
 set(HOOKER_SRC
@@ -197,6 +199,8 @@ set(GAMEENGINE_SRC
     w3d/math/matrix4.cpp
     w3d/math/quaternion.cpp
     w3d/math/vp.cpp
+    w3d/math/lineseg.cpp
+    w3d/math/intersect.cpp
     w3d/renderer/bitmaphandler.cpp
     w3d/renderer/colorspace.cpp
     w3d/renderer/ddsfile.cpp
@@ -206,6 +210,7 @@ set(GAMEENGINE_SRC
     w3d/renderer/mapper.cpp
     w3d/renderer/missing.cpp
     w3d/renderer/render2d.cpp
+    w3d/renderer/renderobj.cpp
     w3d/renderer/shader.cpp
     w3d/renderer/surfaceclass.cpp
     w3d/renderer/synctextureloadtasklist.cpp
@@ -218,6 +223,7 @@ set(GAMEENGINE_SRC
     w3d/renderer/thumbnailmanager.cpp
     w3d/renderer/w3d.cpp
     w3d/renderer/w3dformat.cpp
+    w3d/saveload/persistfactory.cpp
 )
 
 # Game binary only source

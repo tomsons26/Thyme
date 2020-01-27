@@ -3,7 +3,7 @@
  *
  * @author tomsons26
  *
- * @brief Returns the results of a ray cast?
+ * @brief Stores results of a ray or volume cast
  *
  * @copyright Thyme is free software: you can redistribute it and/or
  *            modify it under the terms of the GNU General Public License
@@ -17,24 +17,25 @@
 #include "always.h"
 #include "vector3.h"
 
+// NOTE currently incomplete, add to as functions are discovered
 struct CastResultStruct
 {
     CastResultStruct() { Reset(); }
 
     void Reset()
     {
-        start_bad = false;
-        fraction = 1.0f;
-        normal.Set(0.0f, 0.0f, 0.0f);
-        surface_type = 0;
-        compute_contact_point = false;
-        contact_point.Set(0.0f, 0.0f, 0.0f);
+        m_startBad = false;
+        m_fraction = 1.0f;
+        m_normal.Set(0.0f, 0.0f, 0.0f);
+        m_surfaceType = 0;
+        m_computeContactPoint = false;
+        m_contactPoint.Set(0.0f, 0.0f, 0.0f);
     }
 
-    bool start_bad;
-    float fraction;
-    Vector3 normal;
-    uint32_t surface_type;
-    bool compute_contact_point;
-    Vector3 contact_point;
+    bool m_startBad;
+    float m_fraction;
+    Vector3 m_normal;
+    uint32_t m_surfaceType;
+    bool m_computeContactPoint;
+    Vector3 m_contactPoint;
 };
