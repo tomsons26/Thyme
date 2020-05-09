@@ -28,6 +28,7 @@
 #include <captainslog.h>
 #include "vertmaterial.h"
 #include "texture.h"
+
 class VertexBufferClass;
 class IndexBufferClass;
 class SurfaceClass;
@@ -35,6 +36,8 @@ class DynamicVBAccessClass;
 class DynamicIBAccessClass;
 class LightEnvironmentClass;
 class ZTextureClass;
+class LightClass;
+
 class DX8_CleanupHook
 {
 public:
@@ -162,6 +165,7 @@ public:
     static void Get_DX8_Render_State_Value_Name(StringClass &name, D3DRENDERSTATETYPE state, unsigned value);
     static void Set_Viewport(CONST D3DVIEWPORT8 *pViewport);
     static void Set_Light(unsigned index, const D3DLIGHT8 *light);
+    static void Set_Light(unsigned index, const LightClass &light);
     static void Set_Transform(D3DTRANSFORMSTATETYPE transform, const Matrix4 &m);
     static void Get_Transform(D3DTRANSFORMSTATETYPE transform, Matrix4 &m);
     static void Set_DX8_Render_State(D3DRENDERSTATETYPE state, unsigned value);
