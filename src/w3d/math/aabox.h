@@ -269,13 +269,13 @@ public:
     Vector3 MaxCorner;
 };
 
-void AABoxClass::Init(const MinMaxAABoxClass &mmbox)
+inline void AABoxClass::Init(const MinMaxAABoxClass &mmbox)
 {
     Center = (mmbox.MaxCorner + mmbox.MinCorner) * 0.5f;
     Extent = (mmbox.MaxCorner - mmbox.MinCorner) * 0.5f;
 }
 
-void AABoxClass::Add_Box(const MinMaxAABoxClass &b)
+inline void AABoxClass::Add_Box(const MinMaxAABoxClass &b)
 {
     Vector3 newmin = Center - Extent;
     Vector3 newmax = Center + Extent;

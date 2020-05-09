@@ -194,6 +194,7 @@ set(GAMEENGINE_SRC
     w3d/lib/threadtrack.cpp
     w3d/lib/wwstring.cpp
     w3d/lib/hash.cpp
+    w3d/math/frustum.cpp
     w3d/math/gamemath.cpp
     w3d/math/matrix3.cpp
     w3d/math/matrix3d.cpp
@@ -211,6 +212,8 @@ set(GAMEENGINE_SRC
     w3d/renderer/dx8texman.cpp
     w3d/renderer/dx8vertexbuffer.cpp
     w3d/renderer/dx8wrapper.cpp
+    w3d/renderer/light.cpp
+    w3d/renderer/lightenv.cpp
     w3d/renderer/mapper.cpp
     w3d/renderer/missing.cpp
     w3d/renderer/pointgr.cpp
