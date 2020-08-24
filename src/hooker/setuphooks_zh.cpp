@@ -91,6 +91,7 @@
 #include "weapon.h"
 #include "win32gameengine.h"
 #include "win32localfilesystem.h"
+#include "wininstancedata.h"
 #include "wwstring.h"
 #include <stdarg.h>
 #include <stdio.h>
@@ -947,4 +948,13 @@ void Setup_Hooks()
         static_cast<void (SurfaceClass::*)(unsigned, unsigned, unsigned, unsigned, unsigned, unsigned, SurfaceClass *)>(
             &SurfaceClass::Copy));
     Hook_Method(0x0081DD90, &SurfaceClass::Draw_Pixel);
+
+    // wininstancedata.h
+    Hook_Method(0x006DF300, &WinInstanceData::Hook_Ctor);
+    Hook_Method(0x006DF4C0, &WinInstanceData::Init);
+    Hook_Method(0x006DF680, &WinInstanceData::Set_Text);
+    Hook_Method(0x004F8F30, &WinInstanceData::Get_Text);
+    Hook_Method(0x006DF600, &WinInstanceData::Set_Tooltip_Text);
+    Hook_Method(0x004F93E0, &WinInstanceData::Get_Tooltip_Text);
+    Hook_Method(0x006DF700, &WinInstanceData::Set_VideoBuffer);
 }
