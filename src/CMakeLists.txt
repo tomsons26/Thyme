@@ -55,6 +55,7 @@ set(GAMEENGINE_SRC
     game/client/display.cpp
     game/client/displaystring.cpp
     game/client/displaystringmanager.cpp
+    game/client/debugdisplay.cpp
     game/client/drawgroupinfo.cpp
     game/client/gameclient.cpp
     game/client/gametext.cpp
@@ -62,6 +63,7 @@ set(GAMEENGINE_SRC
     game/client/optionpreferences.cpp
     game/client/terrainroads.cpp
     game/client/view.cpp
+    game/client/w3ddebugdisplay.cpp
     game/client/water.cpp
     game/client/gui/gamefont.cpp
     game/client/gui/wininstancedata.cpp
