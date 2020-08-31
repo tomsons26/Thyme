@@ -64,6 +64,7 @@ set(GAMEENGINE_SRC
     game/client/terrainroads.cpp
     game/client/view.cpp
     game/client/w3ddebugdisplay.cpp
+    game/client/w3dpoly.cpp
     game/client/water.cpp
     game/client/gui/gamefont.cpp
     game/client/gui/wininstancedata.cpp

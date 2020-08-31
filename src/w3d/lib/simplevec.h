@@ -14,6 +14,9 @@
  */
 #pragma once
 #include "always.h"
+#include "captainslog.h"
+
+#include "algorithm"
 
 template<typename T>
 class SimpleVecClass
