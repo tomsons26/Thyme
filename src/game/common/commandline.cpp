@@ -511,7 +511,7 @@ int Parse_Wire_Frame(char **argv, int argc)
 {
 #ifdef GAME_DEBUG_STRUCTS
     if (g_theWriteableGlobalData != nullptr) {
-        g_theWriteableGlobalData->m_wireFrame = true;
+        g_theWriteableGlobalData->m_wireframe = true;
     }
 #endif
     return 1;
