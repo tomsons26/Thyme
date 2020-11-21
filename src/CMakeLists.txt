@@ -244,6 +244,7 @@ set(GAMEENGINE_SRC
     w3d/renderer/dx8wrapper.cpp
     w3d/renderer/light.cpp
     w3d/renderer/lightenv.cpp
+    w3d/renderer/matinfo.cpp
     w3d/renderer/mapper.cpp
     w3d/renderer/mesh.cpp
     w3d/renderer/meshgeometry.cpp
