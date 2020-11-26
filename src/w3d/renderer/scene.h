@@ -1,9 +1,9 @@
 /**
  * @file
  *
- * @author Jonathan Wilson
+ * @author tomsons26
  *
- * @brief scene class
+ * @brief scene classes
  *
  * @copyright Thyme is free software: you can redistribute it and/or
  *            modify it under the terms of the GNU General Public License
@@ -15,11 +15,14 @@
 #pragma once
 
 #include "always.h"
+#include "rendobj.h"
 #include "refcount.h"
 #include "vector3.h"
 
 class RenderObjClass;
 class RenderInfoClass;
+class ChunkSaveClass;
+class ChunkLoadClass;
 
 class SceneIterator
 {
@@ -55,29 +58,53 @@ public:
         EXTRA_PASS_CLEAR_LINE = 0x2,
     };
 
-    virtual ~SceneClass();
-    virtual int Get_Scene_ID();
-    virtual void Add_Render_Object(RenderObjClass *obj);
-    virtual void Remove_Render_Object(RenderObjClass *obj);
+    SceneClass();
+
+    virtual ~SceneClass() {}
+
+    virtual int Get_Scene_ID() { return 0; }
+
+    virtual void Add_Render_Object(RenderObjClass *obj) { obj->Notify_Added(this); }
+    virtual void Remove_Render_Object(RenderObjClass *obj) { obj->Notify_Removed(this); }
+
     virtual SceneIterator *Create_Iterator(bool onlyvisible) = 0;
     virtual void Destroy_Iterator(SceneIterator *it) = 0;
-    virtual void Set_Ambient_Light(const Vector3 &color);
-    virtual const Vector3 &Get_Ambient_Light();
-    virtual void Set_Fog_Enable(bool set);
-    virtual bool Get_Fog_Enable();
-    virtual void Set_Fog_Color(const Vector3 &color);
-    virtual Vector3 &Get_Fog_Color();
-    virtual void Set_Fog_Range(float start, float end);
-    virtual void Get_Fog_Range(float *start, float *end);
-    virtual void Register(class RenderObjClass *obj, RegType for_what) = 0;
-    virtual void Unregister(class RenderObjClass *obj, RegType for_what) = 0;
-    virtual float Compute_Point_Visibility(RenderInfoClass &rinfo, const Vector3 &point);
+
+    virtual void Set_Ambient_Light(const Vector3 &color) { m_ambientLight = color; }
+    virtual const Vector3 &Get_Ambient_Light() { return m_ambientLight; }
+
+    virtual void Set_Fog_Enable(bool set) { m_fogEnabled = set; }
+    virtual bool Get_Fog_Enable() { return m_fogEnabled; }
+    virtual void Set_Fog_Color(const Vector3 &color) { m_fogColor = color; }
+    virtual Vector3 &Get_Fog_Color() { return m_fogColor; }
+    virtual void Set_Fog_Range(float start, float end)
+    {
+        m_fogStart = start;
+        m_fogEnd = end;
+    }
+    virtual void Get_Fog_Range(float *start, float *end)
+    {
+        *start = m_fogStart;
+        *end = m_fogEnd;
+    }
+
+    virtual void Register(RenderObjClass *obj, RegType for_what) = 0;
+    virtual void Unregister(RenderObjClass *obj, RegType for_what) = 0;
+
+    virtual float Compute_Point_Visibility(RenderInfoClass &rinfo, const Vector3 &point) { return 1.0f; }
+
     virtual void Save(ChunkSaveClass &csave);
     virtual void Load(ChunkLoadClass &cload);
+
     virtual void Render(RenderInfoClass &rinfo);
     virtual void Customized_Render(RenderInfoClass &rinfo) = 0;
-    virtual void Pre_Render_Processing(RenderInfoClass &rinfo);
-    virtual void Post_Render_Processing(RenderInfoClass &rinfo);
+    virtual void Pre_Render_Processing(RenderInfoClass &rinfo) {}
+    virtual void Post_Render_Processing(RenderInfoClass &rinfo) {}
+
+    void Set_Polygon_Mode(PolyRenderType type) { m_polyRenderMode = type; }
+    PolyRenderType Get_Polygon_Mode() const { return m_polyRenderMode; }
+    void Set_Extra_Pass_Polygon_Mode(ExtraPassPolyRenderType type) { m_extraPassPolyRenderMode = type; }
+    ExtraPassPolyRenderType Get_Extra_Pass_Polygon_Mode() const { return m_extraPassPolyRenderMode; }
 
 private:
     Vector3 m_ambientLight;
@@ -87,4 +114,36 @@ private:
     Vector3 m_fogColor;
     float m_fogStart;
     float m_fogEnd;
+};
+
+class SimpleSceneClass : public SceneClass
+{
+public:
+    SimpleSceneClass();
+
+    int Get_Scene_ID() override { return 1; }
+
+    void Add_Render_Object(RenderObjClass *obj) { obj->Notify_Added(this); }
+    void Remove_Render_Object(RenderObjClass *obj) { obj->Notify_Removed(this); }
+
+    SceneIterator *Create_Iterator(bool onlyvisible) = 0;
+    void Destroy_Iterator(SceneIterator *it) = 0;
+
+    void Register(RenderObjClass *obj, RegType for_what) = 0;
+    void Unregister(RenderObjClass *obj, RegType for_what) = 0;
+
+    float Compute_Point_Visibility(RenderInfoClass &rinfo, const Vector3 &point) { return 1.0f; }
+
+    void Customized_Render(RenderInfoClass &rinfo) = 0;
+    void Post_Render_Processing(RenderInfoClass &rinfo) {}
+    
+    void Remove_All_Render_Objects();
+    void Visibility_Check(CameraClass *);
+
+private:
+    bool m_visibilityChecked;
+    RefMultiListClass<RenderObjClass> m_renderList;
+    RefMultiListClass<RenderObjClass> m_updateList;
+    RefMultiListClass<RenderObjClass> m_lightList;
+    RefMultiListClass<RenderObjClass> m_releaseList;
 };
