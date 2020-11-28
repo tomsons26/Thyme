@@ -129,6 +129,7 @@ public:
     static void Parse_Percent_To_Real(INI *ini, void *formal, void *store, const void *user_data);
     static void Parse_Angle_Real(INI *ini, void *formal, void *store, const void *user_data);
     static void Parse_Angular_Velocity_Real(INI *ini, void *formal, void *store, const void *user_data);
+    static void Parse_Friction_Per_Sec(INI *ini, void *formal, void *store, const void *user_data);
     static void Parse_AsciiString(INI *ini, void *formal, void *store, const void *user_data);
     static void Parse_Quoted_AsciiString(INI *ini, void *formal, void *store, const void *user_data);
     static void Parse_AsciiString_Vector_Append(INI *ini, void *formal, void *store, const void *user_data);

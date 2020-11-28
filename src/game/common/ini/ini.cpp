@@ -45,7 +45,7 @@ using GameMath::Ceil;
 Xfer *g_sXfer = nullptr;
 #endif
 
-const float _SECONDS_PER_LOGICFRAME_REAL_74 = 1.0f / 30.0f;
+const float _SECONDS_PER_LOGICFRAME_REAL = 1.0f / 30.0f;
 const float _ANGLE_MULTIPLIER = 0.0174532925f;
 const float _DURATION_MULT = 0.029999999f;
 
@@ -179,8 +179,10 @@ INI::INI() :
     m_sepsColon(" \n\r\t=:"),
     m_sepsQuote("\"\n="),
     m_endToken("END"),
-    m_endOfFile(false)
+    m_endOfFile(false),
+    m_blockEnd(0)
 {
+    m_buffer[0] = '\0';
     m_currentBlock[0] = '\0';
 }
 
@@ -564,7 +566,7 @@ void INI::Parse_Angle_Real(INI *ini, void *formal, void *store, const void *user
 
 void INI::Parse_Angular_Velocity_Real(INI *ini, void *formal, void *store, const void *user_data)
 {
-    *static_cast<float *>(store) = Scan_Real(ini->Get_Next_Token()) * (_SECONDS_PER_LOGICFRAME_REAL_74 * _ANGLE_MULTIPLIER);
+    *static_cast<float *>(store) = Scan_Real(ini->Get_Next_Token()) * (_SECONDS_PER_LOGICFRAME_REAL * _ANGLE_MULTIPLIER);
 }
 
 void INI::Parse_AsciiString(INI *ini, void *formal, void *store, const void *user_data)
@@ -707,13 +709,18 @@ void INI::Parse_Duration_Int(INI *ini, void *formal, void *store, const void *us
 
 void INI::Parse_Velocity_Real(INI *ini, void *formal, void *store, const void *user_data)
 {
-    *static_cast<float *>(store) = Scan_Real(ini->Get_Next_Token()) * _SECONDS_PER_LOGICFRAME_REAL_74;
+    *static_cast<float *>(store) = Scan_Real(ini->Get_Next_Token()) * _SECONDS_PER_LOGICFRAME_REAL;
 }
 
 void INI::Parse_Acceleration_Real(INI *ini, void *formal, void *store, const void *user_data)
 {
     *static_cast<float *>(store) =
-        Scan_Real(ini->Get_Next_Token()) * _SECONDS_PER_LOGICFRAME_REAL_74 * _SECONDS_PER_LOGICFRAME_REAL_74;
+        Scan_Real(ini->Get_Next_Token()) * _SECONDS_PER_LOGICFRAME_REAL * _SECONDS_PER_LOGICFRAME_REAL;
+}
+
+void INI::Parse_Friction_Per_Sec(INI *ini, void *formal, void *store, const void *user_data)
+{
+    *static_cast<float *>(store) = Scan_Real(ini->Get_Next_Token()) * _SECONDS_PER_LOGICFRAME_REAL;
 }
 
 void INI::Parse_Bit_In_Int32(INI *ini, void *formal, void *store, const void *user_data)

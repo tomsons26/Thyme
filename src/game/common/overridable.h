@@ -33,6 +33,9 @@ public:
     Overridable *Delete_Overrides();
     void Add_Override(Overridable *obj);
 
+    void Set_Next(Overridable *next) { m_next = next; }
+
+    void Set_Allocated() { m_isAllocated = true; }
     bool Is_Allocated() { return m_isAllocated; }
 
 protected:
