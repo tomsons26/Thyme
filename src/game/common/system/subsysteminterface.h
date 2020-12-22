@@ -25,11 +25,12 @@ public:
     SubsystemInterface();
 
     virtual ~SubsystemInterface();
+
     virtual void Init() = 0;
     virtual void PostProcessLoad() {}
     virtual void Reset() = 0;
     virtual void Update() = 0;
-    virtual void Draw() {}
+    virtual void Draw() { captainslog_error("SubsystemInterface::Draw called - unimplemented for this class!"); }
 
     void Set_Name(Utf8String name);
 
@@ -54,6 +55,9 @@ private:
 class SubsystemInterfaceList
 {
 public:
+    SubsystemInterfaceList() {}
+    ~SubsystemInterfaceList();
+
     void Init_Subsystem(SubsystemInterface *sys,
         const char *default_ini_path,
         const char *ini_path,

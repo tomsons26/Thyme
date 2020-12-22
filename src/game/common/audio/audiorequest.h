@@ -26,9 +26,9 @@ union reqevent_t
 
 enum RequestType
 {
-    REQUEST_MUSIC_ADD,
-    REQUEST_SOUND_ADD,
-    REQUEST_REMOVE,
+    REQUEST_PLAY,
+    REQUEST_PAUSE,
+    REQUEST_STOP,
 };
 
 class AudioRequest : public MemoryPoolObject
@@ -44,25 +44,25 @@ public:
     void Set_Music_Event_Object(AudioEventRTS *object)
     {
         m_event.object = object;
-        m_requestType = REQUEST_MUSIC_ADD;
+        m_requestType = REQUEST_PLAY;
     }
     void Set_Event_Handle(uintptr_t handle)
     {
         m_event.handle = handle;
-        m_requestType = REQUEST_REMOVE;
+        m_requestType = REQUEST_STOP;
     }
     void Set_Type(RequestType type) { m_requestType = type; }
     RequestType Request_Type() const { return m_requestType; }
     uintptr_t Event_Handle() const { return m_event.handle; }
     AudioEventRTS *Event_Object() const { return m_event.object; }
-    bool Is_Adding() const { return m_isAdding; }
+    bool Is_Adding() const { return m_adjustRequest; }
 
 private:
-    AudioRequest(bool is_add) : m_isAdding(is_add), m_isProcessed(false) {}
+    AudioRequest(bool adjust) : m_adjustRequest(adjust), m_adjustRequestCompleted(false) {}
 
 private:
     RequestType m_requestType;
     reqevent_t m_event;
-    bool m_isAdding;
-    bool m_isProcessed;
+    bool m_adjustRequest;
+    bool m_adjustRequestCompleted;
 };

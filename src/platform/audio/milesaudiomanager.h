@@ -110,7 +110,7 @@ private:
     void Release_Miles_Handles(PlayingAudio *audio);
     void Free_All_Miles_Handles();
     void Stop_All_Audio_Immediately();
-    void Play_Stream(AudioEventRTS *event, HSAMPLE stream);
+    const AudioEventInfo *Play_Stream(AudioEventRTS *event, HSAMPLE stream);
     void *Play_Sample3D(AudioEventRTS *event, H3DSAMPLE stream);
     void *Play_Sample(AudioEventRTS *event, HSAMPLE stream);
     bool Start_Next_Loop(PlayingAudio *audio);
@@ -118,6 +118,7 @@ private:
     void Init_Filters3D(H3DSAMPLE sample, AudioEventRTS *event);
     void Init_Sample_Pools();
     void Play_Audio_Event(AudioEventRTS *event);
+    void Pause_Audio_Event(uintptr_t handle);
     void Stop_Audio_Event(uintptr_t handle);
     void Process_Request(AudioRequest *request);
     void Stop_All_Speech();
@@ -173,4 +174,5 @@ private:
     int m_2dSampleCount;
     int m_3dSampleCount;
     int m_streamCount;
+    std::vector<Utf8String> m_loggedAudio;//TODO verify, seems to store all added audio names
 };

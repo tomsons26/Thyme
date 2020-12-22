@@ -23,6 +23,15 @@ float SubsystemInterface::s_totalSubsystemTime;
 
 SubsystemInterface::SubsystemInterface() : m_subsystemName()
 {
+#ifdef GAME_DEBUG_STRUCTS
+    m_updateTimeTracker = 0.0f;
+    m_updateTime = 0.0f;
+    m_drawTimeTracker = 0.0f;
+    m_drawTime = 0.0f;
+    m_logUpdateTime = false;
+    m_logDrawTime = false;
+#endif
+
     if (g_theSubsystemList != nullptr) {
         g_theSubsystemList->Add_Subsystem(this);
     }
@@ -38,6 +47,12 @@ SubsystemInterface::~SubsystemInterface()
 void SubsystemInterface::Set_Name(Utf8String name)
 {
     m_subsystemName = name;
+}
+
+SubsystemInterfaceList::~SubsystemInterfaceList()
+{
+    captainslog_dbgassert(m_subsystems.empty(), "not empty");
+    Shutdown_All();
 }
 
 void SubsystemInterfaceList::Init_Subsystem(SubsystemInterface *sys,

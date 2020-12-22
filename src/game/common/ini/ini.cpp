@@ -182,6 +182,9 @@ INI::INI() :
     m_endOfFile(false)
 {
     m_currentBlock[0] = '\0';
+#ifdef GAME_DEBUG_STRUCTS
+    m_curBlockStart[0] = '\0';
+#endif
 }
 
 INI::~INI() {}
@@ -204,14 +207,22 @@ void INI::Load(Utf8String filename, INILoadType type, Xfer *xfer)
         if (token != nullptr) {
             iniblockparse_t parser = Find_Block_Parse(token);
 
-            captainslog_relassert(parser != nullptr,
-                0xDEAD0006,
-                "[LINE: %d - FILE: '%s'] Unknown block '%s'",
-                m_lineNumber,
-                m_fileName.Str(),
-                token);
-
-            parser(this);
+            if (parser != nullptr) {
+#ifdef GAME_DEBUG_STRUCTS
+                strcpy(m_curBlockStart, m_currentBlock);
+                parser(this);
+                strcpy(m_curBlockStart, "NO_BLOCK");
+#else
+                parser(this);
+#endif
+            } else {
+                captainslog_relassert(parser != nullptr,
+                    0xDEAD0006,
+                    "[LINE: %d - FILE: '%s'] Unknown block '%s'",
+                    m_lineNumber,
+                    m_fileName.Str(),
+                    token);
+            }
         }
     }
 
@@ -305,32 +316,47 @@ void INI::Init_From_INI_Multi(void *what, const MultiIniFieldParse &parse_table_
 
         if (strcasecmp(token, m_endToken) == 0) {
             done = true;
-        } else {
-            inifieldparse_t parsefunc;
-            int offset;
-            const void *data;
-            int exoffset = 0;
+            break;
+        }
 
-            // Find an appropriate parser function from the parse table
-            for (int i = 0;; ++i) {
-                captainslog_relassert(i < parse_table_list.count,
-                    0xDEAD0006,
-                    "[LINE: %d - FILE: '%s'] Unknown field '%s' in block '%s'",
-                    m_lineNumber,
-                    m_fileName.Str(),
-                    token,
-                    m_currentBlock);
+        inifieldparse_t parsefunc;
+        int offset;
+        const void *data;
+        int exoffset = 0;
 
-                parsefunc = Find_Field_Parse(parse_table_list.field_parsers[i], token, offset, data);
+        bool parsed = false;
+        // Find an appropriate parser function from the parse table
+        for (int i = 0;; ++i) {
+            parsefunc = Find_Field_Parse(parse_table_list.field_parsers[i], token, offset, data);
 
-                if (parsefunc != nullptr) {
-                    exoffset = parse_table_list.extra_offsets[i];
-
-                    break;
-                }
+            if (parsefunc != nullptr) {
+                exoffset = parse_table_list.extra_offsets[i];
+                parsefunc(this, what, static_cast<char *>(what) + offset + exoffset, data);
+                parsed = true;
+                break;
             }
+        }
 
-            parsefunc(this, what, static_cast<char *>(what) + offset + exoffset, data);
+        if (!parsed) {
+            captainslog_relassert(parsed == true,
+                0xDEAD0006,
+                "[LINE: %d - FILE: '%s'] Unknown field '%s' in block '%s'",
+                m_lineNumber,
+                m_fileName.Str(),
+                token,
+                m_currentBlock);
+        }
+
+        if (!done && m_endOfFile) {
+            done = true;
+#ifdef GAME_DEBUG_STRUCTS
+            captainslog_relassert(m_endOfFile == false,
+                0xDEAD0006,
+                "Error parsing block '%s', in INI file '%s'.  Missing '%s' token",
+                m_curBlockStart,
+                m_fileName.Str(),
+                m_endToken);
+#endif
         }
     }
 }

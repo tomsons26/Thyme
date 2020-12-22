@@ -177,7 +177,7 @@ void MilesAudioManager::Pause_Audio(AudioAffect affect)
     }
 
     for (auto it = m_audioRequestList.begin(); it != m_audioRequestList.end();) {
-        if (*it != nullptr && (*it)->m_requestType == REQUEST_MUSIC_ADD) {
+        if (*it != nullptr && (*it)->m_requestType == REQUEST_PLAY) {
             (*it)->Delete_Instance();
             it = m_audioRequestList.erase(it);
         } else {
@@ -231,7 +231,7 @@ void MilesAudioManager::Kill_Event_Immediately(uintptr_t event)
 {
     // Iterate the various lists until a matching handle is found.
     for (auto it = m_audioRequestList.begin(); it != m_audioRequestList.end(); ++it) {
-        if (*it != nullptr && (*it)->Request_Type() == REQUEST_MUSIC_ADD && (*it)->Event_Handle() == event) {
+        if (*it != nullptr && (*it)->Request_Type() == REQUEST_PLAY && (*it)->Event_Handle() == event) {
             (*it)->Delete_Instance();
             m_audioRequestList.erase(it);
 
@@ -357,7 +357,7 @@ bool MilesAudioManager::Has_Music_Track_Completed(const Utf8String &name, int lo
 Utf8String MilesAudioManager::Music_Track_Name()
 {
     for (auto it = m_audioRequestList.begin(); it != m_audioRequestList.end(); ++it) {
-        if ((*it)->Request_Type() == REQUEST_MUSIC_ADD && (*it)->Is_Adding()
+        if ((*it)->Request_Type() == REQUEST_PLAY && (*it)->Is_Adding()
             && (*it)->Event_Object()->Get_Event_Info()->Get_Event_Type() == EVENT_MUSIC) {
             return (*it)->Event_Object()->Get_Event_Name();
         }
@@ -683,7 +683,7 @@ bool MilesAudioManager::Does_Violate_Limit(AudioEventRTS *event) const
     }
 
     for (auto it = m_audioRequestList.begin(); it != m_audioRequestList.end(); ++it) {
-        if ((*it) != nullptr && (*it)->m_isAdding && event->Get_Event_Name() == (*it)->m_event.object->Get_Event_Name()) {
+        if ((*it) != nullptr && (*it)->m_adjustRequest && event->Get_Event_Name() == (*it)->m_event.object->Get_Event_Name()) {
             ++playing_matches;
             ++request_matches;
         }
@@ -1027,7 +1027,7 @@ void MilesAudioManager::Process_Request_List()
     for (auto it = m_audioRequestList.begin(); it != m_audioRequestList.end();) {
         if (*it != nullptr) {
             if (Process_Request_This_Frame(*it)) {
-                if (!(*it)->m_isProcessed || Check_For_Sample(*it)) {
+                if (!(*it)->m_adjustRequestCompleted || Check_For_Sample(*it)) {
                     Process_Request(*it);
                 }
 
@@ -1491,7 +1491,7 @@ void MilesAudioManager::Stop_All_Audio_Immediately()
  *
  * Inlined
  */
-void MilesAudioManager::Play_Stream(AudioEventRTS *event, HSAMPLE stream)
+const AudioEventInfo *MilesAudioManager::Play_Stream(AudioEventRTS *event, HSAMPLE stream)
 {
     if (event->Get_Event_Info()->Get_Event_Type() == EVENT_MUSIC) {
         AIL_set_stream_loop_count(stream, 1000000);
@@ -1499,7 +1499,7 @@ void MilesAudioManager::Play_Stream(AudioEventRTS *event, HSAMPLE stream)
 
     AIL_register_stream_callback(stream, Set_Stream_Complete);
     AIL_start_stream(stream);
-    // AudioEventRTS::getAudioEventInfo(v13); // Unclear why original has this call here.
+    return event->Get_Event_Info();
 }
 
 /**
@@ -1577,7 +1577,7 @@ bool MilesAudioManager::Start_Next_Loop(PlayingAudio *audio)
         audio->miles.stopped = 1;
         AudioRequest *request = Allocate_Audio_Request(true);
         request->m_event.object = audio->miles.audio_event;
-        request->m_isProcessed = true;
+        request->m_adjustRequestCompleted = true;
         Append_Audio_Request(request);
 
         return true;
@@ -1845,6 +1845,15 @@ void MilesAudioManager::Play_Audio_Event(AudioEventRTS *event)
 }
 
 /**
+ *
+ *
+ * INLINED
+ */
+void MilesAudioManager::Pause_Audio_Event(uintptr_t handle)
+{
+}
+
+/**
  * Stops an audio event from a handle.
  *
  * 0x0077D630
@@ -1896,10 +1905,13 @@ void MilesAudioManager::Stop_Audio_Event(uintptr_t handle)
 void MilesAudioManager::Process_Request(AudioRequest *request)
 {
     switch (request->m_requestType) {
-        case REQUEST_MUSIC_ADD:
+        case REQUEST_PLAY:
             Play_Audio_Event(request->m_event.object);
             break;
-        case REQUEST_REMOVE:
+        case REQUEST_PAUSE:
+            Pause_Audio_Event(request->m_event.handle);
+            break;
+        case REQUEST_STOP:
             Stop_Audio_Event(request->m_event.handle);
             break;
         default:
@@ -2180,7 +2192,7 @@ void MilesAudioManager::Init_Playing_Audio(PlayingAudio *audio)
  */
 bool MilesAudioManager::Process_Request_This_Frame(AudioRequest *request)
 {
-    if (request->m_isAdding) {
+    if (request->m_adjustRequest) {
         return request->m_event.object->Get_Delay() < MSEC_PER_LOGICFRAME_REAL;
     }
 
@@ -2194,9 +2206,9 @@ bool MilesAudioManager::Process_Request_This_Frame(AudioRequest *request)
  */
 void MilesAudioManager::Adjust_Request(AudioRequest *request)
 {
-    if (request->m_isAdding) {
+    if (request->m_adjustRequest) {
         request->m_event.object->Decrement_Delay(MSEC_PER_LOGICFRAME_REAL);
-        request->m_isProcessed = true;
+        request->m_adjustRequestCompleted = true;
     }
 }
 
@@ -2207,7 +2219,7 @@ void MilesAudioManager::Adjust_Request(AudioRequest *request)
  */
 bool MilesAudioManager::Check_For_Sample(AudioRequest *request)
 {
-    if (request->m_isAdding) {
+    if (request->m_adjustRequest) {
         return true;
     }
 

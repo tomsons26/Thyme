@@ -856,3 +856,9 @@ void Setup_Hooks()
     Hook_Method(0x00500860, &DX8Wrapper::Get_DX8_Texture_Stage_State_Value_Name);
     Hook_Method(0x00501B10, &DX8Wrapper::Get_Back_Buffer_Format);
 }
+
+static_assert(sizeof(SubsystemInterfaceList) == 0x18, "Size mismatch!");
+static_assert(sizeof(SubsystemInterface) == 0x1C, "Size mismatch!");
+static_assert(sizeof(INI) == 0x283C, "Size mismatch!");
+static_assert(sizeof(MilesProviderStruct) == 0xC, "Size mismatch!");
+static_assert(sizeof(MilesAudioManager) == 0x414, "Size mismatch!");

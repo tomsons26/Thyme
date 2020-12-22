@@ -176,6 +176,9 @@ private:
     const char *m_sepsQuote;
     const char *m_endToken;
     bool m_endOfFile;
+#ifdef GAME_DEBUG_STRUCTS
+    char m_curBlockStart[MAX_LINE_LENGTH];
+#endif
 };
 
 #ifdef GAME_DLL
