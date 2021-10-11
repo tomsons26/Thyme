@@ -327,6 +327,7 @@ set(GAMEENGINE_GAME_SRC
 
 set(GAMEENGINE_WB_SRC
     editor/editmain.cpp
+    editor/mainframe.cpp
 )
 
 # Don't try and build the miles sound system when not building to link to the original game.
@@ -457,18 +458,21 @@ endif()
 # Note that we don't care about which math lib we link against for worldbuilder.
 # Since worldbuilder isn't multiplayer we don't need to worry about sources of indeterminancy
 if(BUILD_EDITOR)
-    set(CMAKE_MFC_FLAG 2) #Enable MFC
+    # set(CMAKE_MFC_FLAG 2) #Enable MFC
     if(STANDALONE)
         add_executable(thymeedit ${GAMEENGINE_WB_SRC})
-        target_link_libraries(thymeedit PRIVATE thyme_lib)
+        target_include_directories(thymeedit BEFORE PRIVATE ${CMAKE_SOURCE_DIR}/deps/oldmfc/include)
+        target_link_libraries(thymeedit PRIVATE thyme_lib ${CMAKE_SOURCE_DIR}/deps/oldmfc/mfc42.lib ${CMAKE_SOURCE_DIR}/deps/oldmfc/mfcs42.lib)
+        target_compile_definitions(thymeedit PRIVATE ${GAME_COMPILE_OPTIONS} -DBUILD_EDITOR -D_AFXDLL -D_AFX_NOFORCE_LIBS "ALLOW_HOOKING=")
+        target_compile_definitions(thymeedit PRIVATE $<$<CONFIG:DEBUG>:GAME_DEBUG>)
     endif()
 
     if(BUILD_DLL)
         add_library(thymeedit_dll SHARED ${HOOKER_SRC} ${HOOKER_WB_SRC} ${GAMEENGINE_WB_SRC} ${GAMEENGINE_SRC} ${GAMEENGINE_HEADERS})
-        target_include_directories(thymeedit_dll BEFORE PRIVATE ${CMAKE_SOURCE_DIR}/deps/stlport)
+        target_include_directories(thymeedit_dll BEFORE PRIVATE ${CMAKE_SOURCE_DIR}/deps/stlport ${CMAKE_SOURCE_DIR}/deps/oldmfc/include)
         target_include_directories(thymeedit_dll PRIVATE hooker ${GAMEENGINE_INCLUDES})
-        target_compile_definitions(thymeedit_dll PRIVATE -DGAME_DLL -DTHYME_USE_STLPORT -DGAME_DEBUG_STRUCTS -DBUILD_EDITOR -D_USE_32BIT_TIME_T)
-        target_link_libraries(thymeedit_dll ${GAME_LINK_LIBRARIES} crash_handler)
+        target_compile_definitions(thymeedit_dll PRIVATE -DGAME_DLL -DTHYME_USE_STLPORT -DGAME_DEBUG_STRUCTS -DBUILD_EDITOR -D_USE_32BIT_TIME_T -D_AFXDLL -D_AFX_NOFORCE_LIBS)
+        target_link_libraries(thymeedit_dll ${GAME_LINK_LIBRARIES} crash_handler ${CMAKE_SOURCE_DIR}/deps/oldmfc/mfc42.lib)
         target_compile_definitions(thymeedit_dll PRIVATE ${GAME_COMPILE_OPTIONS} "ALLOW_HOOKING=friend void Setup_Hooks()\;")
         target_compile_definitions(thymeedit_dll PRIVATE $<$<CONFIG:DEBUG>:GAME_DEBUG>)
         set_target_properties(thymeedit_dll PROPERTIES OUTPUT_NAME thymeedit PDB_NAME thymeeditdll)
