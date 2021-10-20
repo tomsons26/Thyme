@@ -26,7 +26,7 @@
 #pragma pack(push, _AFX_PACKING)
 #endif
 
-#ifdef _DEBUG
+#ifdef _MFC_DEBUG
 static char _szAfxTempl[] = "afxtempl.h";
 #undef THIS_FILE
 #define THIS_FILE _szAfxTempl
@@ -38,7 +38,7 @@ static char _szAfxTempl[] = "afxtempl.h";
 
 /////////////////////////////////////////////////////////////////////////////
 // global helpers (can be overridden)
-
+#if 0
 #ifdef new
 #undef new
 #define _REDEF_NEW
@@ -46,6 +46,7 @@ static char _szAfxTempl[] = "afxtempl.h";
 
 #ifndef _INC_NEW
 	#include <new.h>
+#endif
 #endif
 
 template<class TYPE>
@@ -99,7 +100,7 @@ void AFXAPI SerializeElements(CArchive& ar, TYPE* pElements, int nCount)
 		ar.Read((void*)pElements, nCount * sizeof(TYPE));
 }
 
-#ifdef _DEBUG
+#ifdef _MFC_DEBUG
 template<class TYPE>
 void AFXAPI DumpElements(CDumpContext& dc, const TYPE* pElements, int nCount)
 {
@@ -160,7 +161,7 @@ template<> void AFXAPI ConstructElements<COleVariant> (COleVariant* pElements, i
 template<> void AFXAPI DestructElements<COleVariant> (COleVariant* pElements, int nCount);
 template<> void AFXAPI CopyElements<COleVariant> (COleVariant* pDest, const COleVariant* pSrc, int nCount);
 template<> void AFXAPI SerializeElements<COleVariant> (CArchive& ar, COleVariant* pElements, int nCount);
-#ifdef _DEBUG
+#ifdef _MFC_DEBUG
 template<> void AFXAPI DumpElements<COleVariant> (CDumpContext& dc, const COleVariant* pElements, int nCount);
 #endif
 template<> UINT AFXAPI HashKey<const struct tagVARIANT&> (const struct tagVARIANT& var);
@@ -169,7 +170,7 @@ void AFXAPI ConstructElements(COleVariant* pElements, int nCount);
 void AFXAPI DestructElements(COleVariant* pElements, int nCount);
 void AFXAPI CopyElements(COleVariant* pDest, const COleVariant* pSrc, int nCount);
 void AFXAPI SerializeElements(CArchive& ar, COleVariant* pElements, int nCount);
-#ifdef _DEBUG
+#ifdef _MFC_DEBUG
 void AFXAPI DumpElements(CDumpContext& dc, const COleVariant* pElements, int nCount);
 #endif
 UINT AFXAPI HashKey(const struct tagVARIANT& var);
@@ -231,7 +232,7 @@ protected:
 public:
 	~CArray();
 	void Serialize(CArchive&);
-#ifdef _DEBUG
+#ifdef _MFC_DEBUG
 	void Dump(CDumpContext&) const;
 	void AssertValid() const;
 #endif
@@ -527,7 +528,7 @@ void CArray<TYPE, ARG_TYPE>::Serialize(CArchive& ar)
 	SerializeElements<TYPE>(ar, m_pData, m_nSize);
 }
 
-#ifdef _DEBUG
+#ifdef _MFC_DEBUG
 template<class TYPE, class ARG_TYPE>
 void CArray<TYPE, ARG_TYPE>::Dump(CDumpContext& dc) const
 {
@@ -646,7 +647,7 @@ protected:
 public:
 	~CList();
 	void Serialize(CArchive&);
-#ifdef _DEBUG
+#ifdef _MFC_DEBUG
 	void Dump(CDumpContext&) const;
 	void AssertValid() const;
 #endif
@@ -1066,7 +1067,7 @@ void CList<TYPE, ARG_TYPE>::Serialize(CArchive& ar)
 	}
 }
 
-#ifdef _DEBUG
+#ifdef _MFC_DEBUG
 template<class TYPE, class ARG_TYPE>
 void CList<TYPE, ARG_TYPE>::Dump(CDumpContext& dc) const
 {
@@ -1168,7 +1169,7 @@ protected:
 public:
 	~CMap();
 	void Serialize(CArchive&);
-#ifdef _DEBUG
+#ifdef _MFC_DEBUG
 	void Dump(CDumpContext&) const;
 	void AssertValid() const;
 #endif
@@ -1479,7 +1480,7 @@ void CMap<KEY, ARG_KEY, VALUE, ARG_VALUE>::Serialize(CArchive& ar)
 	}
 }
 
-#ifdef _DEBUG
+#ifdef _MFC_DEBUG
 template<class KEY, class ARG_KEY, class VALUE, class ARG_VALUE>
 void CMap<KEY, ARG_KEY, VALUE, ARG_VALUE>::Dump(CDumpContext& dc) const
 {
@@ -1705,10 +1706,12 @@ public:
 #undef THIS_FILE
 #define THIS_FILE __FILE__
 
+#if 0
 #undef new
 #ifdef _REDEF_NEW
 #define new DEBUG_NEW
 #undef _REDEF_NEW
+#endif
 #endif
 
 #ifdef _AFX_PACKING
