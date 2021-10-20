@@ -15,6 +15,7 @@
 #pragma once
 
 #include "always.h"
+
 #include <afxwin.h>
 #include <afxext.h>
 
@@ -36,6 +37,8 @@ public:
 
     void ResetWindowPositions();
     void AdjustWindowSize();
+
+    static CMainFrame *GetMainFrame() { return TheMainFrame; }
 
 protected:
     CStatusBar m_wndStatusBar;
@@ -91,7 +94,8 @@ protected:
     afx_msg void OnDestroy();
     afx_msg void OnTimer(UINT nIDEvent);
 
-    CMainFrame *TheMainFrame;
+    // TODO
+    static CMainFrame *TheMainFrame;
 
     DECLARE_MESSAGE_MAP()
 };

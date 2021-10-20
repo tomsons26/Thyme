@@ -1,7 +1,13 @@
 #include "mainframe.h"
-//#include "resource.h"
 
 class CWorldBuilderDoc;
+
+//TODO
+CMainFrame *CMainFrame::TheMainFrame;
+
+
+//for testing mfc app
+#define MFC_TEST
 
 IMPLEMENT_DYNAMIC(CMainFrame, CFrameWnd)
 
@@ -40,6 +46,10 @@ CMainFrame::CMainFrame() :
     m_autoSaveInterval(0)
 {
     TheMainFrame = this;
+
+#ifdef MFC_TEST
+    Create(NULL, TEXT("MFC Window"));
+#endif
 }
 
 CMainFrame::~CMainFrame() {}

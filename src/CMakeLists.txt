@@ -328,6 +328,7 @@ set(GAMEENGINE_GAME_SRC
 set(GAMEENGINE_WB_SRC
     editor/editmain.cpp
     editor/mainframe.cpp
+    editor/worldbuilderapp.cpp
 )
 
 # Don't try and build the miles sound system when not building to link to the original game.
