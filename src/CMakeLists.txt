@@ -4,6 +4,8 @@ set(GAMEENGINE_INCLUDES
     game
     game/client
     game/client/draw
+    game/client/gui/gadgets
+    game/client/gui/transitions
     game/client/gui
     game/client/input
     game/client/shadow
@@ -76,7 +78,36 @@ set(GAMEENGINE_SRC
     game/client/water.cpp
     game/client/worldheightmap.cpp
     game/client/draw/drawable.cpp
+    game/client/gui/gadgets/gadgetcheckbox.cpp
+    game/client/gui/gadgets/gadgetcombobox.cpp
+    game/client/gui/gadgets/gadgethorizontalslider.cpp
+    game/client/gui/gadgets/gadgetlistbox.cpp
+    game/client/gui/gadgets/gadgetprogressbar.cpp
+    game/client/gui/gadgets/gadgetpushbutton.cpp
+    game/client/gui/gadgets/gadgetradiobutton.cpp
+    game/client/gui/gadgets/gadgetstatictext.cpp
+    game/client/gui/gadgets/gadgettabcontrol.cpp
+    game/client/gui/gadgets/gadgettextentry.cpp
+    game/client/gui/gadgets/gadgetverticalslider.cpp
+    game/client/gui/transitions/buttonflashtransition.cpp
+    game/client/gui/transitions/controlbararrowtransition.cpp
+    game/client/gui/transitions/countuptransition.cpp
+    game/client/gui/transitions/fadetransition.cpp
+    game/client/gui/transitions/flashtransition.cpp
+    game/client/gui/transitions/fullfadetransition.cpp
+    game/client/gui/transitions/mainmenumediumscaleuptransition.cpp
+    game/client/gui/transitions/mainmenuscaleuptransition.cpp
+    game/client/gui/transitions/mainmenusmallscaledowntransition.cpp
+    game/client/gui/transitions/reversesoundtransition.cpp
+    game/client/gui/transitions/scaleuptransition.cpp
+    game/client/gui/transitions/scorescaleuptransition.cpp
+    game/client/gui/transitions/screenfadetransition.cpp
+    game/client/gui/transitions/textonframetransition.cpp
+    game/client/gui/transitions/texttypetransition.cpp
     game/client/gui/gamefont.cpp
+    game/client/gui/gamewindow.cpp
+    game/client/gui/gamewindowmanager.cpp
+    game/client/gui/gamewindowtransitions.cpp
     game/client/gui/wininstancedata.cpp
     game/client/image.cpp
     game/client/input/keyboard.cpp

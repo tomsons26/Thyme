@@ -36,7 +36,7 @@ typedef void (*debugdisplaycallback_t)(DebugDisplayInterface *, void *, FILE *);
 class Display : public SubsystemInterface
 {
     // names based on related code
-protected:
+public:
     enum DrawImageMode
     {
         DRAWIMAGE_ADDITIVE_ALPHA = 0,
