@@ -52,6 +52,15 @@ public:
     bool Is_Point_In_Footprint(const Coord3D &pos, const Coord3D &point) const;
     void Make_Random_Offset_In_Footprint(Coord3D &offset) const;
     void Make_Random_Offset_In_Perimeter(Coord3D &offset) const;
+
+    GeometryType Get_Type() const { return m_type; }
+    bool Get_Is_Small() const { return m_isSmall; }
+    float Get_Height() const { return m_height; }
+    float Get_Major_Radius() const { return m_majorRadius; }
+    float Get_Minor_Radius() const { return m_minorRadius; }
+    float Get_Bounding_Circle_Radius() const { return m_boundingCircleRadius; }
+    float Get_Bounding_Sphere_Radius() const { return m_boundingSphereRadius; }
+
     // TODO none virtual functions.
 
     static void Parse_Geometry_MinorRadius(INI *ini, void *formal, void *store, void *user_data);

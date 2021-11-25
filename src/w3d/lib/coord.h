@@ -24,7 +24,45 @@ class Coord2D
 public:
     Coord2D() : x(0.0f), y(0.0f) {}
     Coord2D(float x_val, float y_val) : x(x_val), y(y_val) {}
+
     float Length() { return float(Sqrt(float(float(x * x) + float(y * y)))); }
+
+    void Normalize()
+    {
+        float len = Length();
+
+        if (len != 0.0f) {
+            x /= len;
+            y /= len;
+        }
+    }
+
+    float To_Angle()
+    {
+        float len = Length();
+
+        if (len == 0.0f) {
+            return 0.0;
+        }
+
+        float value = x / len;
+
+        if (value < -1.0f) {
+            value = -1.0f;
+        } else if (value > 1.0f) {
+            value = 1.0f;
+        }
+
+        float angle;
+        if (y < 0.0f) {
+            angle = -GameMath::Acos(value);
+        } else
+        {
+            angle = GameMath::Acos(value);
+        }
+
+        return angle;
+    }
 
     Coord2D &operator+=(const Coord2D &rhs)
     {
@@ -112,12 +150,32 @@ class Coord3D
 public:
     Coord3D() : x(0.0f), y(0.0f), z(0.0f) {}
     Coord3D(float x_val, float y_val, float z_val) : x(x_val), y(y_val), z(z_val) {}
-    float Length() { return float(Sqrt(float(float(float(x * x) + float(y * y)) + float(z * z)))); }
+
+    void Set(float x_val, float y_val, float z_val)
+    {
+        x = x_val;
+        y = y_val;
+        z = z_val;
+    }
+
     static void Cross_Product(const Coord3D *a, const Coord3D *b, Coord3D *set_result)
     {
         set_result->x = a->y * b->z - a->z * b->y;
         set_result->y = a->z * b->x - a->x * b->z;
         set_result->z = a->x * b->y - a->y * b->x;
+    }
+
+    float Length() { return float(Sqrt(float(float(float(x * x) + float(y * y)) + float(z * z)))); }
+
+    void Normalize()
+    {
+        float len = Length();
+
+        if (len != 0.0f) {
+            x /= len;
+            y /= len;
+            z /= len;
+        }
     }
 
     void Zero()

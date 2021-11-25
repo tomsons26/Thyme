@@ -91,6 +91,8 @@ enum DrawableStatus
 enum PathfindLayerEnum
 {
     LAYER_UNK,
+
+    LAYER_COUNT = 16,
 };
 
 enum BuildableStatus
