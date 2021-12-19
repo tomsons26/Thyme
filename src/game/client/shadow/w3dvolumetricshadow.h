@@ -15,14 +15,17 @@
 #pragma once
 
 #include "always.h"
-#include "aabox.h"
-#include "colmath.h"
 #include "hash.h"
+#include "matrix4.h"
 #include "refcount.h"
-#include "sphere.h"
 #include "vector3.h"
 #include "vector3i.h"
+#include "w3dbuffermanager.h"
+#include "w3dshadow.h"
 #include <new>
+
+#include "aabox.h"
+#include "sphere.h"
 
 class RenderObjClass;
 class W3DShadowGeometry;
@@ -51,6 +54,8 @@ struct PolyNeighbor
     NeighborEdge neighbor[3];
 };
 #pragma pack(pop)
+
+static_assert(sizeof(PolyNeighbor) == 0x16, "PolyNeighbor size incorrect!");
 
 class W3DShadowGeometryMesh
 {
@@ -157,14 +162,56 @@ public:
     W3DShadowGeometry *Get_Current_Geom();
 };
 
+struct W3DRenderTask
+{
+    W3DRenderTask *m_nextTask;
+};
+
+class W3DVolumetricShadow;
+
+struct W3DVolumetricShadowRenderTask : W3DRenderTask
+{
+    W3DVolumetricShadow *m_parentShadow;
+    unsigned char m_meshIndex;
+    unsigned char m_lightIndex;
+};
+
+class W3DVolumetricShadowManager
+{
+public:
+    W3DVolumetricShadowManager();
+    ~W3DVolumetricShadowManager();
+
+    int Init();
+    void Reset();
+
+    void Release_Resources();
+    int Re_Acquire_Resources();
+
+    class W3DVolumetricShadow *Add_Shadow(RenderObjClass *robj, Shadow::ShadowTypeInfo *shadowInfo);
+
+    void Remove_Shadow(W3DVolumetricShadow *shadow);
+    void Remove_All_Shadows();
+
+    void Add_Dynamic_Shadow_Task(W3DVolumetricShadowRenderTask *task);
+
+    void Render_Stencil_Shadows();
+    void Render_Shadows(bool force_stencil_fill);
+
+    void Invalidate_Cached_Light_Positions();
+
+private:
+    W3DVolumetricShadow *m_shadowList;
+    W3DVolumetricShadowRenderTask *m_dynamicShadowVolumesToRender;
+    W3DShadowGeometryManager *m_W3DShadowGeometryManager;
+};
+
 struct Geometry
 {
 public:
     enum VisibleState
     {
-        STATE_INVISIBLE = CollisionMath::OUTSIDE,
-        STATE_VISIBLE = CollisionMath::INSIDE,
-        STATE_UNKNOWN = CollisionMath::OVERLAPPED,
+        STATE_0,
     };
 
     Geometry();
@@ -174,7 +221,7 @@ public:
     Geometry(Geometry &);
     Geometry &operator=(Geometry &);
 
-    bool Create(int num_vert, int num_poly);
+    bool Create(int, int);
 
     void Release();
 
@@ -185,13 +232,14 @@ public:
     int Get_Num_Vertex() const { return m_numVertex; }
 
     int Get_Num_Active_Polygon() const { return m_numActivePolygon; }
+    int Get_Num_Active_Vertex() const { return m_numActiveVertex; }
+
     int Set_Num_Active_Polygon(int num)
     {
         m_numActivePolygon = num;
         return num;
     }
 
-    int Get_Num_Active_Vertex() const { return m_numActiveVertex; }
     int Set_Num_Active_Vertex(int num)
     {
         m_numActiveVertex = num;
@@ -207,7 +255,7 @@ public:
 
     int Set_Polygon_Index(int index, const short *index_list)
     {
-        m_indices[3 * index + 0] = index_list[0];
+        m_indices[3 * index + 0] = *index_list;
         m_indices[3 * index + 1] = index_list[1];
         m_indices[3 * index + 2] = index_list[2];
         return 3;
@@ -222,11 +270,11 @@ public:
     AABoxClass &Get_Bounding_Box() { return m_boundingBox; }
     void Set_Bounding_Box(AABoxClass &box) { m_boundingBox = box; }
 
-    SphereClass &Get_Bounding_Sphere() { return m_boundingSphere; }
     void Set_Bounding_Sphere(SphereClass &sphere) { m_boundingSphere = sphere; }
+    SphereClass &Get_Bounding_Sphere() { return m_boundingSphere; }
 
-    VisibleState Get_Visible_State() const { return m_visibleState; }
     void Set_Visible_State(VisibleState state) { m_visibleState = state; }
+    VisibleState Get_Visible_State() const { return m_visibleState; }
 
 private:
     Vector3 *m_verts;
@@ -243,4 +291,71 @@ private:
     SphereClass m_boundingSphere;
 
     VisibleState m_visibleState;
+};
+
+class W3DVolumetricShadow : public Shadow
+{
+    friend class W3DVolumetricShadowManager;
+
+public:
+    W3DVolumetricShadow();
+    ~W3DVolumetricShadow();
+
+    void Set_Geometry(W3DShadowGeometry *geo);
+
+    void Add_Silhouette_Edge(int mesh_index, PolyNeighbor *poly_neighbor, PolyNeighbor *hidden);
+    void Add_Neighborless_Edges(int mesh_index, PolyNeighbor *poly_neighbor);
+
+    void Add_Silhouette_Indices(int index, short start, short end);
+
+    bool Allocate_Shadow_Volume(int volume_index, int mesh_index);
+    void Delete_Shadow_Volume(int volume_index);
+    void Reset_Shadow_Volume(int volume_index, int mesh_index);
+
+    bool Allocate_Silhouette(int index, int count);
+    void Delete_Silhouette(int index);
+    void Reset_Silhouette(int index);
+
+    void Release() override;
+
+    void Set_Light_Pos_History(int volume_index, int mesh_index, const Vector3 &pos)
+    {
+        m_lightPosHistory[volume_index][mesh_index] = pos;
+    }
+
+    void Set_Shadow_Length_Scale(float scale) { m_shadowLengthScale = scale; }
+
+    void Set_Optimal_Extrusion_Padding(float padding) { m_optimalExtrusionPadding = padding; }
+
+    void Set_Render_Object(RenderObjClass *robj) { m_robj = robj; }
+
+    void Set_Bounds_Radius(float radius) { m_boundsRadius = radius; }
+
+private:
+    W3DVolumetricShadow *m_next;
+
+    W3DShadowGeometry *m_geometry;
+    RenderObjClass *m_robj;
+    float m_shadowLengthScale;
+    float m_boundsRadius;
+    float m_optimalExtrusionPadding;
+
+    Geometry *m_shadowVolume[1][MAX_SHADOW_CASTER_MESHES];
+
+    W3DBufferManager::W3DVertexBufferSlot *m_shadowVolumeVB[1][MAX_SHADOW_CASTER_MESHES];
+    W3DBufferManager::W3DIndexBufferSlot *m_shadowVolumeIB[1][MAX_SHADOW_CASTER_MESHES];
+
+    W3DVolumetricShadowRenderTask m_shadowVolumeRenderTask[1][MAX_SHADOW_CASTER_MESHES];
+
+    int m_shadowVolumeCount[MAX_SHADOW_CASTER_MESHES];
+
+    Vector3 m_lightPosHistory[1][MAX_SHADOW_CASTER_MESHES];
+    Matrix4 m_objectXformHistory[1][MAX_SHADOW_CASTER_MESHES];
+
+    short *m_silhouetteIndex[MAX_SHADOW_CASTER_MESHES];
+
+    short m_numSilhouetteIndices[MAX_SHADOW_CASTER_MESHES];
+    short m_maxSilhouetteEntries[MAX_SHADOW_CASTER_MESHES];
+
+    int m_numIndicesPerMesh[MAX_SHADOW_CASTER_MESHES];
 };

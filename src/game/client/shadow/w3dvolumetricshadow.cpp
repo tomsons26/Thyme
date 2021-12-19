@@ -17,8 +17,16 @@
 #include "mesh.h"
 #include "meshmdl.h"
 #include "missing.h"
+#include "view.h"
+#include "w3dbuffermanager.h"
 #include <cmath>
 #include <new>
+
+#include "baseheightmap.h"
+#include "globaldata.h"
+#ifdef BUILD_WITH_D3D8
+#include <d3dx8.h>
+#endif
 
 class MeshModelClass;
 
@@ -139,7 +147,7 @@ void W3DShadowGeometryMesh::Build_Polygon_Neighbors()
 
                                     const float epsilon = 1.0f / 100.0f;
 
-                                    if (GameMath::Fabs((*other_normal * *normal) + 1.0f) > epsilon) {
+                                    if (fabsf((*other_normal * *normal) + 1.0f) > epsilon) {
                                         index2 = poly[k];
                                     }
                                 }
@@ -436,8 +444,8 @@ void W3DShadowGeometryManager::Free_All_Geoms()
     W3DShadowGeometryManagerIterator it(*this);
 
     for (it.First(); !it.Is_Done(); it.Next()) {
-        W3DShadowGeometry *geo = it.Get_Current_Geom();
-        geo->Release_Ref();
+        W3DShadowGeometry *v1 = it.Get_Current_Geom();
+        v1->Release_Ref();
     }
 
     m_geomPtrTable->Reset();
@@ -526,6 +534,380 @@ W3DShadowGeometry *W3DShadowGeometryManagerIterator::Get_Current_Geom()
     return static_cast<W3DShadowGeometry *>(Get_Current());
 }
 
+W3DVolumetricShadowManager::W3DVolumetricShadowManager() :
+    m_shadowList(nullptr),
+    // BUGFIX original didn't init these
+    m_dynamicShadowVolumesToRender(nullptr),
+    m_W3DShadowGeometryManager(nullptr)
+{
+    m_W3DShadowGeometryManager = new W3DShadowGeometryManager;
+
+    g_theW3DBufferManager = new W3DBufferManager;
+}
+
+W3DVolumetricShadowManager::~W3DVolumetricShadowManager()
+{
+    Release_Resources();
+
+    if (m_W3DShadowGeometryManager != nullptr) {
+        delete m_W3DShadowGeometryManager;
+    }
+    m_W3DShadowGeometryManager = nullptr;
+
+    if (g_theW3DBufferManager != nullptr) {
+        delete g_theW3DBufferManager;
+    }
+    g_theW3DBufferManager = nullptr;
+}
+
+int W3DVolumetricShadowManager::Init()
+{
+    return 1;
+}
+
+void W3DVolumetricShadowManager::Reset()
+{
+    m_W3DShadowGeometryManager->Free_All_Geoms();
+    g_theW3DBufferManager->Free_All_Buffers();
+}
+
+void W3DVolumetricShadowManager::Release_Resources()
+{
+    if (g_shadowIndexBufferD3D != nullptr) {
+        g_shadowIndexBufferD3D->Release();
+    }
+    if (g_shadowVertexBufferD3D != nullptr) {
+        g_shadowVertexBufferD3D->Release();
+    }
+    g_shadowIndexBufferD3D = nullptr;
+    g_shadowVertexBufferD3D = nullptr;
+
+    if (g_theW3DBufferManager != nullptr) {
+        g_theW3DBufferManager->Release_Resources();
+
+        Invalidate_Cached_Light_Positions();
+    }
+}
+
+int W3DVolumetricShadowManager::Re_Acquire_Resources()
+{
+    Release_Resources();
+#ifdef BUILD_WITH_D3D8
+    IDirect3DDevice8 *device = DX8Wrapper::Get_D3D_Device8();
+
+    captainslog_dbgassert(device, "Trying to ReAquireResources on W3DVolumetricShadowManager without device");
+
+    if (device->CreateIndexBuffer(sizeof(unsigned short) * SHADOW_INDEX_SIZE,
+            D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY,
+            D3DFMT_INDEX16,
+            D3DPOOL_DEFAULT,
+            &g_shadowIndexBufferD3D)
+        < 0) {
+        return 0;
+    }
+    if (!g_shadowVertexBufferD3D
+        && device->CreateVertexBuffer(sizeof(Vector3) * SHADOW_VERTEX_SIZE,
+               D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY,
+               0,
+               D3DPOOL_DEFAULT,
+               &g_shadowVertexBufferD3D)
+            < 0) {
+        return 0;
+    }
+    if (g_theW3DBufferManager == nullptr || g_theW3DBufferManager->ReAcquire_Resources()) {
+        return 1;
+    }
+#endif
+    return 0;
+}
+
+void W3DVolumetricShadowManager::Remove_Shadow(W3DVolumetricShadow *shadow)
+{
+    W3DVolumetricShadow *s = nullptr;
+
+    for (W3DVolumetricShadow *i = m_shadowList; i != nullptr; i = i->m_next) {
+        if (i == shadow) {
+            if (s) {
+                s->m_next = shadow->m_next;
+            } else {
+                m_shadowList = shadow->m_next;
+            }
+            delete shadow;
+            return;
+        }
+        s = i;
+    }
+}
+
+void W3DVolumetricShadowManager::Remove_All_Shadows()
+{
+    W3DVolumetricShadow *next;
+
+    for (W3DVolumetricShadow *i = m_shadowList; i != nullptr; i = next) {
+        next = i->m_next;
+        i->m_next = nullptr;
+        delete i;
+    }
+
+    m_shadowList = nullptr;
+}
+
+void W3DVolumetricShadowManager::Add_Dynamic_Shadow_Task(W3DVolumetricShadowRenderTask *task)
+{
+    W3DVolumetricShadowRenderTask *cur = m_dynamicShadowVolumesToRender;
+    m_dynamicShadowVolumesToRender = task;
+    m_dynamicShadowVolumesToRender->m_nextTask = cur;
+}
+
+void W3DVolumetricShadowManager::Render_Stencil_Shadows()
+{
+#ifdef BUILD_WITH_D3D8
+    struct _TRANS_LIT_VERTEX
+    {
+        D3DXVECTOR4 p;
+        unsigned long color;
+    };
+
+    IDirect3DDevice8 *dev = DX8Wrapper::Get_D3D_Device8();
+    if (dev != nullptr) {
+        _TRANS_LIT_VERTEX vertex[4];
+
+        int32_t x;
+        int32_t y;
+
+        g_theTacticalView->Get_Origin(&x, &y);
+
+        int32_t width = g_theTacticalView->Get_Width();
+        int32_t height = g_theTacticalView->Get_Height();
+
+        float fy = float(height + y);
+        float fx = float(width + x);
+
+        vertex[0].p = D3DXVECTOR4(fx, fy, 0.0f, 1.0f);
+        vertex[1].p = D3DXVECTOR4(fx, 0.0f, 0.0f, 1.0f);
+        vertex[2].p = D3DXVECTOR4(float(x), fy, 0.0f, 1.0f);
+        vertex[3].p = D3DXVECTOR4(float(x), 0.0f, 0.0f, 1.0f);
+
+        vertex[0].color = g_theW3DShadowManager->Get_Shadow_Color();
+        vertex[1].color = g_theW3DShadowManager->Get_Shadow_Color();
+        vertex[2].color = g_theW3DShadowManager->Get_Shadow_Color();
+        vertex[3].color = g_theW3DShadowManager->Get_Shadow_Color();
+
+        dev->SetVertexShader(D3DFVF_DIFFUSE | D3DFVF_XYZRHW);
+        dev->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE);
+        dev->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_DESTCOLOR);
+        dev->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ZERO);
+        dev->SetRenderState(D3DRS_ZENABLE, TRUE);
+        dev->SetRenderState(D3DRS_ZFUNC, D3DCMP_ALWAYS);
+        dev->SetRenderState(D3DRS_STENCILENABLE, TRUE);
+        dev->SetRenderState(D3DRS_STENCILFUNC, D3DCMP_LESSEQUAL);
+        dev->SetRenderState(D3DRS_STENCILPASS, D3DSTENCILOP_KEEP);
+        dev->SetRenderState(D3DRS_STENCILMASK, ~g_theW3DShadowManager->Get_Stencil_Mask());
+        dev->SetRenderState(D3DRS_STENCILREF, 1);
+        dev->SetRenderState(D3DRS_SHADEMODE, D3DSHADE_FLAT);
+
+        if (DX8Wrapper::Is_Triangle_Draw_Enabled()) {
+            dev->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, 2, vertex, sizeof(_TRANS_LIT_VERTEX));
+        }
+
+        dev->SetRenderState(D3DRS_SHADEMODE, D3DSHADE_GOURAUD);
+        dev->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
+        dev->SetRenderState(D3DRS_STENCILENABLE, FALSE);
+    }
+#endif
+}
+
+void W3DVolumetricShadowManager::Render_Shadows(bool force_stencil_fill)
+{
+#if 0
+    W3DVolumetricShadowRenderTask *v8; // [esp+Ch] [ebp-4Ch]
+    int color_write; // [esp+10h] [ebp-48h]
+    W3DVolumetricShadowRenderTask *j; // [esp+14h] [ebp-44h]
+    W3DVolumetricShadowRenderTask *i; // [esp+18h] [ebp-40h]
+    W3DBufferManager::W3DVertexBuffer *vb; // [esp+24h] [ebp-34h]
+    W3DVolumetricShadow *k; // [esp+2Ch] [ebp-2Ch]
+
+    int count = 0;
+    AABoxClass aabox;
+    SphereClass sphere;
+
+    g_theTerrainRenderObject->Get_Maximum_Visible_Box(shadowCameraFrustum, &aabox, 1);
+
+    bcX = aabox.m_center.X;
+    bcY = aabox.m_center.Y;
+    bcZ = aabox.m_center.Z;
+    beX = aabox.m_extent.X;
+    beY = aabox.m_extent.Y;
+    beZ = aabox.m_extent.Z;
+
+    if (m_shadowList && g_theWriteableGlobalData->m_shadowVolumes) {
+
+        IDirect3DDevice8 *dev = DX8Wrapper::Get_D3D_Device8();
+
+        if (dev != nullptr) {
+
+            nShadowIndicesInBuf = 0xFFFF;
+            nShadowVertsInBuf = 0xFFFF;
+
+            VertexMaterialClass *material = VertexMaterialClass::Get_Preset(VertexMaterialClass::PRELIT_DIFFUSE);
+            DX8Wrapper::Set_Material(material);
+
+            Ref_Ptr_Release(material);
+
+            DX8Wrapper::Set_Shader(ShaderClass::s_presetOpaqueShader);
+
+            DX8Wrapper::Set_Texture(0, 0);
+            DX8Wrapper::Set_Texture(1u, 0);
+
+            DX8Wrapper::Apply_Render_State_Changes();
+
+            dev->SetRenderState(D3DRS_ZFUNC, 4);
+            dev->SetRenderState(D3DRS_ZENABLE, 1);
+            dev->SetRenderState(D3DRS_ZWRITEENABLE, 0);
+            dev->SetRenderState(D3DRS_ALPHATESTENABLE, 0);
+            dev->SetRenderState(D3DRS_FOGENABLE, 0);
+            dev->SetRenderState(D3DRS_SHADEMODE, 1);
+            dev->SetRenderState(D3DRS_LIGHTING, 0);
+
+            dev->SetTextureStageState(0, D3DTSS_COLORARG1, 2);
+            dev->SetTextureStageState(0, D3DTSS_COLORARG2, 0);
+            dev->SetTextureStageState(0, D3DTSS_COLOROP, 3);
+            dev->SetTextureStageState(0, D3DTSS_ALPHAOP, 1);
+            dev->SetTextureStageState(0, D3DTSS_TEXCOORDINDEX, 0);
+            dev->SetTextureStageState(1, D3DTSS_COLOROP, 1);
+            dev->SetTextureStageState(1, D3DTSS_ALPHAOP, 1);
+            dev->SetTextureStageState(1, D3DTSS_TEXCOORDINDEX, 1);
+
+            dev->SetTexture(0, 0);
+            dev->SetTexture(1, 0);
+
+            color_write = 0x12345678;
+
+            const DX8Caps *v2 = DX8Wrapper::Get_Current_Caps();
+
+            if (DX8Caps::Get_DX8_Caps(v2)->PrimitiveMiscCaps & 0x80) {
+                dev->GetRenderState(D3DRS_COLORWRITEENABLE, (unsigned int *)&color_write);
+                DX8Wrapper::Set_DX8_Render_State(D3DRS_COLORWRITEENABLE, 0);
+            } else {
+                dev->SetRenderState(D3DRS_SRCBLEND, 1);
+                dev->SetRenderState(D3DRS_DESTBLEND, 2);
+                dev->SetRenderState(D3DRS_ALPHABLENDENABLE, 1);
+            }
+
+            dev->SetRenderState(D3DRS_STENCILENABLE, 1);
+
+            if (g_theW3DShadowManager->Get_Stencil_Mask() == 0x80808080) {
+                dev->SetRenderState(D3DRS_STENCILFUNC, 6);
+            } else {
+                dev->SetRenderState(D3DRS_STENCILFUNC, 7);
+            }
+
+            dev->SetRenderState(D3DRS_STENCILREF, 0x80808080);
+            dev->SetRenderState(D3DRS_STENCILMASK, g_theW3DShadowManager->Get_Stencil_Mask());
+            dev->SetRenderState(D3DRS_STENCILWRITEMASK, 0xFFFFFFFF);
+            dev->SetRenderState(D3DRS_STENCILZFAIL, 1);
+            dev->SetRenderState(D3DRS_STENCILFAIL, 1);
+            dev->SetRenderState(D3DRS_STENCILPASS, 7);
+            dev->SetVertexShader(2);
+            dev->SetRenderState(D3DRS_CULLMODE, 2);
+
+            lastActiveVertexBuffer = 0;
+
+            m_dynamicShadowVolumesToRender = 0;
+
+            for (k = m_shadowList; k; k = k->m_next) {
+                if (k->m_isEnabled) {
+                    if (!k->m_isInvisibleEnabled) {
+                        v8 = m_dynamicShadowVolumesToRender;
+                        W3DVolumetricShadow::Update(k);
+                        j = m_dynamicShadowVolumesToRender;
+                        while (j != v8) {
+                            W3DVolumetricShadow::RenderVolume(k, j->m_meshIndex, j->m_lightIndex);
+                            j = (W3DVolumetricShadowRenderTask *)j->base.m_nextTask;
+                            ++count;
+                        }
+                    }
+                }
+            }
+            int format = W3DBufferManager::Get_DX8_Format(W3DBufferManager::VBM_FVF_XYZ);
+            dev->SetVertexShader(format);
+
+            for (vb = W3DBufferManager::getNextVertexBuffer(TheW3DBufferManager, 0, 0); vb;
+                 vb = W3DBufferManager::getNextVertexBuffer(TheW3DBufferManager, vb, 0)) {
+                i = (W3DVolumetricShadowRenderTask *)vb->m_renderTaskList;
+                while (i) {
+                    W3DVolumetricShadow::RenderVolume(i->m_parentShadow, i->m_meshIndex, i->m_lightIndex);
+                    i = (W3DVolumetricShadowRenderTask *)i->base.m_nextTask;
+                    ++count;
+                }
+            }
+
+            dev->SetRenderState(D3DRS_STENCILPASS, 5);
+            dev->SetRenderState(D3DRS_CULLMODE, 3);
+
+            for (vb = W3DBufferManager::getNextVertexBuffer(TheW3DBufferManager, 0, 0); vb;
+                 vb = W3DBufferManager::getNextVertexBuffer(TheW3DBufferManager, vb, 0)) {
+                for (i = (W3DVolumetricShadowRenderTask *)vb->m_renderTaskList; i;
+                     i = (W3DVolumetricShadowRenderTask *)i->base.m_nextTask) {
+                    W3DVolumetricShadow::RenderVolume(i->m_parentShadow, i->m_meshIndex, i->m_lightIndex);
+                }
+            }
+
+            dev->SetVertexShader(2);
+
+            for (j = m_dynamicShadowVolumesToRender; j; j = (W3DVolumetricShadowRenderTask *)j->base.m_nextTask) {
+                W3DVolumetricShadow::RenderVolume(j->m_parentShadow, j->m_meshIndex, j->m_lightIndex);
+            }
+
+            for (vb = W3DBufferManager::getNextVertexBuffer(TheW3DBufferManager, 0, 0); vb;
+                 vb = W3DBufferManager::getNextVertexBuffer(TheW3DBufferManager, vb, 0)) {
+                vb->m_renderTaskList = 0;
+            }
+
+            dev->SetRenderState(D3DRS_CULLMODE, 2);
+
+            if (color_write != 0x12345678) {
+                DX8Wrapper::Set_DX8_Render_State(D3DRS_COLORWRITEENABLE, color_write);
+            }
+
+            Render_Stencil_Shadows();
+
+            dev->SetRenderState(D3DRS_SHADEMODE, 2);
+            dev->SetRenderState(D3DRS_ALPHABLENDENABLE, 0);
+            dev->SetRenderState(D3DRS_LIGHTING, 0);
+
+            DX8Wrapper::Invalidate_Cached_Render_States();
+        }
+    } else if (force_stencil_fill) {
+        VertexMaterialClass *vetmat = VertexMaterialClass::Get_Preset(VertexMaterialClass::PRELIT_DIFFUSE);
+        DX8Wrapper::Set_Material(vetmat);
+
+        Ref_Ptr_Release(vetmat);
+
+        DX8Wrapper::Set_Shader(ShaderClass::s_presetOpaqueShader);
+        DX8Wrapper::Set_Texture(0, nullptr);
+        DX8Wrapper::Apply_Render_State_Changes();
+
+        Render_Stencil_Shadows();
+        DX8Wrapper::Invalidate_Cached_Render_States();
+    }
+#endif
+}
+void W3DVolumetricShadowManager::Invalidate_Cached_Light_Positions()
+{
+    if (m_shadowList != nullptr) {
+        Vector3 v(0.0, 0.0, 0.0);
+
+        for (W3DVolumetricShadow *i = m_shadowList; i != nullptr; i = i->m_next) {
+            for (int j = 0; j < 1; ++j) {
+                for (int k = 0; k < MAX_SHADOW_CASTER_MESHES; ++k) {
+                    i->Set_Light_Pos_History(j, k, &v);
+                }
+            }
+        }
+    }
+}
+
 Geometry::Geometry() :
     m_verts(nullptr),
     m_indices(nullptr),
@@ -533,9 +915,9 @@ Geometry::Geometry() :
     m_numVertex(0),
     m_flags(0),
     // BUGFIX original didn't init these
+    m_visibleState(STATE_0),
     m_numActivePolygon(0),
-    m_numActiveVertex(0),
-    m_visibleState(STATE_UNKNOWN)
+    m_numActiveVertex(0)
 {
 }
 
@@ -547,11 +929,6 @@ Geometry::~Geometry()
 bool Geometry::Create(int num_vert, int num_poly)
 {
     if (num_vert) {
-        // BUGFIX Geos can be reused so clean up to avoid memory leak
-        if (m_verts != nullptr) {
-            delete[] m_verts;
-        }
-
         m_verts = new Vector3[num_vert];
         if (m_verts == nullptr) {
             return false;
@@ -559,19 +936,9 @@ bool Geometry::Create(int num_vert, int num_poly)
     }
 
     if (num_poly) {
-        // BUGFIX Geos can be reused so clean up to avoid memory leak
-        if (m_indices != nullptr) {
-            delete[] m_indices;
-        }
-
         m_indices = new short[3 * num_poly];
 
         if (m_indices == nullptr) {
-            // BUGFIX clean up to avoid memory leak
-            if (m_verts != nullptr) {
-                delete[] m_verts;
-            }
-
             return false;
         }
     }
@@ -599,4 +966,291 @@ void Geometry::Release()
     m_numActivePolygon = 0;
     m_numVertex = 0;
     m_numActiveVertex = 0;
+}
+
+W3DVolumetricShadow::W3DVolumetricShadow()
+{
+    m_next = nullptr;
+    m_geometry = nullptr;
+
+    m_shadowLengthScale = 0.0;
+    m_optimalExtrusionPadding = 0.0;
+    m_robj = nullptr;
+
+    m_isEnabled = true;
+    m_isInvisibleEnabled = false;
+
+    for (int i = 0; i < MAX_SHADOW_CASTER_MESHES; ++i) {
+
+        m_numSilhouetteIndices[i] = 0;
+        m_maxSilhouetteEntries[i] = 0;
+
+        m_silhouetteIndex[i] = nullptr;
+        m_shadowVolumeCount[i] = 0;
+    }
+
+    for (int i = 0; i < 1; ++i) {
+
+        for (int j = 0; j < MAX_SHADOW_CASTER_MESHES; ++j) {
+
+            m_shadowVolume[i][j] = nullptr;
+            m_shadowVolumeVB[i][j] = nullptr;
+            m_shadowVolumeIB[i][j] = nullptr;
+
+            m_shadowVolumeRenderTask[i][j].m_parentShadow = this;
+            m_shadowVolumeRenderTask[i][j].m_meshIndex = j;
+            m_shadowVolumeRenderTask[i][j].m_lightIndex = i;
+
+            m_objectXformHistory[i][j].Make_Identity();
+
+            m_lightPosHistory[i][j] = Vector3(0.0f, 0.0f, 0.0f);
+        }
+    }
+}
+
+W3DVolumetricShadow::~W3DVolumetricShadow()
+{
+    for (int i = 0; i < MAX_SHADOW_CASTER_MESHES; ++i) {
+        Delete_Silhouette(i);
+    }
+    for (int volume_index = 0; volume_index < 1; ++volume_index) {
+        for (int mesh_index = 0; mesh_index < MAX_SHADOW_CASTER_MESHES; ++mesh_index) {
+
+            if (m_shadowVolume[volume_index][mesh_index] != nullptr) {
+                Geometry *geo = m_shadowVolume[volume_index][mesh_index];
+                delete geo;
+            }
+
+            if (m_shadowVolumeVB[volume_index][mesh_index] != nullptr) {
+                g_theW3DBufferManager->Release_Slot(m_shadowVolumeVB[volume_index][mesh_index]);
+            }
+
+            if (m_shadowVolumeIB[volume_index][mesh_index] != nullptr) {
+                g_theW3DBufferManager->Release_Slot(m_shadowVolumeIB[volume_index][mesh_index]);
+            }
+        }
+    }
+
+    Ref_Ptr_Release(m_geometry);
+
+    m_robj = nullptr;
+}
+
+void W3DVolumetricShadow::Set_Geometry(W3DShadowGeometry *geo)
+{
+    unsigned short num_verticies = 0;
+    unsigned short new_num_verticies = 0;
+
+    for (int i = 0; i < MAX_SHADOW_CASTER_MESHES; ++i) {
+        if (m_geometry != nullptr) {
+            W3DShadowGeometryMesh *mesh = m_geometry->Get_Mesh(i);
+            num_verticies = mesh->Get_Num_Vertex();
+        }
+
+        if (geo != nullptr) {
+            W3DShadowGeometryMesh *mesh = geo->Get_Mesh(i);
+            new_num_verticies = mesh->Get_Num_Vertex();
+        }
+
+        if (new_num_verticies > num_verticies) {
+            Delete_Silhouette(i);
+            if (!Allocate_Silhouette(i, new_num_verticies)) {
+                return;
+            }
+        }
+    }
+
+    m_geometry = geo;
+}
+
+void W3DVolumetricShadow::Add_Silhouette_Edge(int mesh_index, PolyNeighbor *poly_neighbor, PolyNeighbor *hidden)
+{
+    int edge = 0;
+
+    W3DShadowGeometryMesh *geo_mesh = m_geometry->Get_Mesh(mesh_index);
+
+    for (int i = 0; i < 3; ++i) {
+        if (poly_neighbor->neighbor[i].neighborIndex == hidden->myIndex) {
+            edge = i;
+            break;
+        }
+    }
+
+    // BUGFIX Original didn't clear these
+    short start = 0;
+    short end = 0;
+
+    short index_list[4];
+
+    geo_mesh->Get_Polygon_Index(poly_neighbor->myIndex, index_list);
+
+    if (index_list[0] != poly_neighbor->neighbor[edge].neighborEdgeIndex[0]
+        && index_list[0] != poly_neighbor->neighbor[edge].neighborEdgeIndex[1]) {
+
+        start = index_list[1];
+        end = index_list[2];
+
+    } else if (index_list[1] != poly_neighbor->neighbor[edge].neighborEdgeIndex[0]
+        && index_list[1] != poly_neighbor->neighbor[edge].neighborEdgeIndex[1]) {
+
+        start = index_list[2];
+        end = index_list[0];
+
+    } else {
+
+        start = index_list[0];
+        end = index_list[1];
+    }
+
+    Add_Silhouette_Indices(mesh_index, start, end);
+}
+
+void W3DVolumetricShadow::Add_Neighborless_Edges(int mesh_index, PolyNeighbor *poly_neighbor)
+{
+    W3DShadowGeometryMesh *geo_mesh = m_geometry->Get_Mesh(mesh_index);
+
+    // BUGFIX Original didn't clear these
+    short start = 0;
+    short end = 0;
+
+    short index_list[4];
+
+    geo_mesh->Get_Polygon_Index(poly_neighbor->myIndex, index_list);
+
+    for (int i = 0; i < 3; ++i) {
+        start = index_list[i];
+
+        if (i == 2) {
+            end = index_list[0];
+        } else {
+            end = index_list[i + 1];
+        }
+
+        bool add = true;
+
+        for (int j = 0; j < 3; ++j) {
+            if (poly_neighbor->neighbor[j].neighborIndex != -1
+                && (poly_neighbor->neighbor[j].neighborEdgeIndex[0] == start
+                        && poly_neighbor->neighbor[j].neighborEdgeIndex[1] == end
+                    || poly_neighbor->neighbor[j].neighborEdgeIndex[1] == start
+                        && poly_neighbor->neighbor[j].neighborEdgeIndex[0] == end)) {
+                add = false;
+                break;
+            }
+        }
+
+        if (add) {
+            Add_Silhouette_Indices(mesh_index, start, end);
+        }
+    }
+}
+
+void W3DVolumetricShadow::Add_Silhouette_Indices(int index, short start, short end)
+{
+    m_silhouetteIndex[index][(short)m_numSilhouetteIndices[index]++] = start;
+    m_silhouetteIndex[index][(short)m_numSilhouetteIndices[index]++] = end;
+}
+
+bool W3DVolumetricShadow::Allocate_Shadow_Volume(int volume_index, int mesh_index)
+{
+    if (volume_index < 0 || volume_index >= 1) {
+        return false;
+    }
+
+    Geometry *geo = m_shadowVolume[volume_index][mesh_index];
+
+    if (geo == nullptr) {
+        geo = new Geometry;
+        ++m_shadowVolumeCount[mesh_index];
+    }
+
+    if (geo == nullptr) {
+        --m_shadowVolumeCount[mesh_index];
+        return false;
+    }
+
+    m_shadowVolume[volume_index][mesh_index] = geo;
+
+    int num = m_maxSilhouetteEntries[mesh_index];
+
+    if (geo->Get_Flags() & 1 && !geo->Create(2 * num, num)) {
+
+        delete geo;
+
+        return false;
+    }
+
+    return true;
+}
+
+void W3DVolumetricShadow::Delete_Shadow_Volume(int volume_index)
+{
+    if (volume_index >= 0 && volume_index < 1) {
+        for (int mesh_index = 0; mesh_index < MAX_SHADOW_CASTER_MESHES; ++mesh_index) {
+            if (m_shadowVolume[volume_index][mesh_index]) {
+                Geometry *geo = m_shadowVolume[volume_index][mesh_index];
+
+                delete geo;
+
+                m_shadowVolume[volume_index][mesh_index] = nullptr;
+                --m_shadowVolumeCount[mesh_index];
+            }
+        }
+    }
+}
+
+void W3DVolumetricShadow::Reset_Shadow_Volume(int volume_index, int mesh_index)
+{
+    if (volume_index >= 0 && volume_index < 1) {
+
+        Geometry *geo = m_shadowVolume[volume_index][mesh_index];
+
+        if (geo != nullptr) {
+            if (m_shadowVolumeVB[volume_index][mesh_index] != nullptr) {
+                g_theW3DBufferManager->Release_Slot(m_shadowVolumeVB[volume_index][mesh_index]);
+                m_shadowVolumeVB[volume_index][mesh_index] = nullptr;
+            }
+
+            if (m_shadowVolumeIB[volume_index][mesh_index] != nullptr) {
+                g_theW3DBufferManager->Release_Slot(m_shadowVolumeIB[volume_index][mesh_index]);
+                m_shadowVolumeIB[volume_index][mesh_index] = nullptr;
+            }
+
+            geo->Release();
+        }
+    }
+}
+
+bool W3DVolumetricShadow::Allocate_Silhouette(int index, int count)
+{
+    this->m_silhouetteIndex[index] = new short[5 * count];
+
+    if (m_silhouetteIndex[index] == nullptr) {
+        return false;
+    }
+
+    m_numSilhouetteIndices[index] = 0;
+    m_maxSilhouetteEntries[index] = 5 * count;
+
+    return true;
+}
+
+void W3DVolumetricShadow::Delete_Silhouette(int index)
+{
+    if (m_silhouetteIndex[index] != nullptr) {
+        delete[] m_silhouetteIndex;
+    }
+
+    m_silhouetteIndex[index] = nullptr;
+    m_numSilhouetteIndices[index] = 0;
+}
+
+void W3DVolumetricShadow::Reset_Silhouette(int index)
+{
+    m_numSilhouetteIndices[index] = 0;
+}
+
+void W3DVolumetricShadow::Release()
+{
+    g_theW3DVolumetricShadowManager->Remove_Shadow(this);
 }
