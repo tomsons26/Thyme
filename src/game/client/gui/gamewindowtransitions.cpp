@@ -14,6 +14,10 @@
  */
 #include "gamewindowtransitions.h"
 
+#ifndef GAME_DLL
+GameWindowTransitionsHandler *g_theTransitionHandler;
+#endif
+
 void GameWindowTransitionsHandler::Init()
 {
     // TODO investigate should this clear m_groupList, original doesn't
@@ -43,5 +47,13 @@ void GameWindowTransitionsHandler::Draw()
 {
 #ifdef GAME_DLL
     Call_Method<void, GameWindowTransitionsHandler>(PICK_ADDRESS(0x00515010, 0), this);
+#endif
+}
+
+void GameWindowTransitionsHandler::Load()
+{
+    // TODO
+#ifdef GAME_DLL
+    Call_Method<void, GameWindowTransitionsHandler>(PICK_ADDRESS(0xBAAAAAAAA, 0), this);
 #endif
 }

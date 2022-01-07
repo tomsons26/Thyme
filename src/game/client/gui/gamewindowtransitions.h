@@ -50,6 +50,8 @@ public:
     virtual void Update() override;
     virtual void Draw() override;
 
+    void Load();
+
 protected:
     std::list<TransitionGroup *> m_groupList;
     TransitionGroup *m_group1;
@@ -57,3 +59,9 @@ protected:
     TransitionGroup *m_group3;
     TransitionGroup *m_group4;
 };
+
+#ifdef GAME_DLL
+extern GameWindowTransitionsHandler *&g_theTransitionHandler;
+#else
+extern GameWindowTransitionsHandler *g_theTransitionHandler;
+#endif

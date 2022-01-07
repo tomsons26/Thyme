@@ -100,11 +100,131 @@ enum GameWindowStyle
     GWS_COMBO_BOX = 1 << 15,
 };
 
+enum GameWindowMessage
+{
+    GWM_NONE,
+
+    GWM_CREATE, // Freshly created window
+    GWM_DESTROY, // Window is being destroyed
+    GWM_3, // ?
+    GWM_4, // ?
+
+    // Left mouse
+    GWM_LEFT_DOWN,
+    GWM_LEFT_UP,
+    GWM_7,
+    GWM_LEFT_DRAG,
+
+    // Middle mouse
+    GWM_MIDDLE_DOWN,
+    GWM_MIDDLE_UP,
+    GWM_11,
+    GWM_MIDDLE_DRAG,
+
+    // Right mouse
+    GWM_RIGHT_DOWN,
+    GWM_RIGHT_UP,
+    GWM_15,
+    GWM_RIGHT_DRAG,
+
+    GWM_MOUSE_ENTERING,
+    GWM_MOUSE_LEAVING,
+
+    GWM_WHEEL_UP,
+    GWM_WHEEL_DOWN,
+
+    GWM_CHAR, // Keyboard input
+
+    GWM_SCRIPT_CREATE, // Freshly created window from a WND script
+
+    GWM_INPUT_FOCUS, // Window gained input focus
+
+    GWM_MOUSE_POS, // Mouse position
+
+    GWM_IME_CHAR, // IME input
+
+    GWM_26,
+
+};
+
+enum GadgetGameMessage
+{
+
+    // Gadget Game Message
+
+    GGM_LEFT_DRAG = 0x4000,
+    GGM_SET_LABEL,
+    GGM_GET_LABEL,
+    GGM_FOCUS_CHANGE,
+    GGM_RESIZE,
+    GGM_CLOSE,
+    GBM_MOUSE_ENTERING,
+    GBM_MOUSE_LEAVING,
+    GBM_SELECTED,
+    GBM_SELECTED_RIGHT,
+    GBM_SET_SELECTION,
+
+    // Gadget Slider Message
+
+    GSM_SLIDER_TRACK,
+    GSM_SET_SLIDER,
+    GSM_SET_MIN_MAX,
+    GSM_SLIDER_DONE,
+
+    // Gadget Listbox Message
+
+    GLM_ADD_ENTRY,
+    GLM_DEL_ENTRY,
+    GLM_DEL_ALL,
+    GLM_SELECTED,
+    GLM_DOUBLE_CLICKED,
+    GLM_RIGHT_CLICKED,
+    GLM_SET_SELECTION,
+    GLM_GET_SELECTION,
+    GLM_TOGGLE_MULTI_SELECTION,
+    GLM_GET_TEXT,
+    GLM_SET_UP_BUTTON,
+    GLM_SET_DOWN_BUTTON,
+    GLM_SET_SLIDER,
+    GLM_SCROLL_BUFFER,
+    GLM_UPDATE_DISPLAY,
+    GLM_GET_ITEM_DATA,
+    GLM_SET_ITEM_DATA,
+
+    // Gadget Combobox Message
+
+    GCM_ADD_ENTRY,
+    GCM_DEL_ENTRY,
+    GCM_DEL_ALL,
+    GCM_SELECTED,
+    GCM_GET_TEXT,
+    GCM_SET_TEXT,
+    GCM_EDIT_DONE,
+    GCM_GET_ITEM_DATA,
+    GCM_SET_ITEM_DATA,
+    GCM_GET_SELECTION,
+    GCM_SET_SELECTION,
+    GCM_UPDATE_TEXT,
+
+    // Gadget Entry Message
+
+    GEM_GET_TEXT,
+    GEM_SET_TEXT,
+    GEM_EDIT_DONE,
+    GEM_UPDATE_TEXT,
+
+    // Gadget Progressbar Message
+
+    GPM_SET_PROGRESS,
+};
+
 typedef WindowMsgHandledType(__cdecl *WindowCallbackFunc)(
     GameWindow *window, unsigned int message, unsigned int data_1, unsigned int data_2);
 
 typedef void(__cdecl *WindowDrawFunc)(GameWindow *window, WinInstanceData *instance);
 typedef void(__cdecl *WindowTooltipFunc)(GameWindow *window, WinInstanceData *instance, unsigned int mouse);
+
+typedef void(__cdecl *WindowMsgBoxCallbackFunc)();
 
 struct GameWindowEditData
 {
@@ -131,8 +251,17 @@ public:
 
     void Normalize_Window_Region();
 
+    GameWindow *Find_First_Leaf();
+    GameWindow *Find_Last_Leaf();
+    GameWindow *Find_Prev_Leaf();
+    GameWindow *Find_Next_Leaf();
+
     int Win_Next_Tab();
     int Win_Prev_Tab();
+
+    int Win_Bring_To_Top();
+
+    int Win_Activate();
 
     int Win_Set_Position(int x, int y);
     int Win_Get_Position(int *x, int *y);
@@ -146,11 +275,13 @@ public:
 
     bool Win_Point_In_Window(int x, int y);
 
+    int Win_Set_Size(int width, int height);
     int Win_Get_Size(int *width, int *height);
 
     int Win_Enable(bool enable);
     bool Win_Is_Enabled();
 
+    int Win_Hide(bool hide);
     bool Win_Is_Hidden();
 
     int Win_Set_Status(int status);
@@ -192,6 +323,7 @@ public:
     int Win_Set_Window_Id(int id);
     int Win_Get_Window_Id();
 
+    int Win_Set_Parent(GameWindow *window);
     GameWindow *Win_Get_Parent();
 
     bool Win_Is_Child(GameWindow *window);
@@ -214,7 +346,11 @@ public:
     GameWindow *Win_Get_Next_In_Layout();
     GameWindow *Win_Get_Prev_In_Layout();
 
+    int Win_Set_System_Func(WindowCallbackFunc system_func);
+    int Win_Set_Input_Func(WindowCallbackFunc input_func);
+    int Win_Set_Draw_Func(WindowDrawFunc draw_func);
     int Win_Set_Tooltip_Func(WindowTooltipFunc tooltip);
+    int Win_Set_Callbacks(WindowCallbackFunc input, WindowDrawFunc draw, WindowTooltipFunc tooltip);
 
     int Win_Draw_Window();
 

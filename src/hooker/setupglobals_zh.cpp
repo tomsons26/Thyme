@@ -638,3 +638,19 @@ AudioEventRTS &ThingTemplate::s_audioEventNoSound = Make_Global<AudioEventRTS>(P
 // drawable.cpp
 #include "drawable.h"
 int &Drawable::s_modelLockCount = Make_Global<int>(PICK_ADDRESS(0x00A2B920, 0x00E25D70));
+
+// gamewindowmanager.cpp
+class GameWindowManager;
+GameWindowManager *&g_theWindowManager = Make_Global<GameWindowManager *>(PICK_ADDRESS(0x00A2BEF0, 0x0));
+
+
+// gamewindowmanagerscript.cpp
+Utf8String &s_theDrawString = Make_Global<Utf8String>(PICK_ADDRESS(0x00A31B48, 0));
+Utf8String &s_theTooltipString = Make_Global<Utf8String>(PICK_ADDRESS(0x00A31B4C, 0));
+Utf8String &s_theInputString = Make_Global<Utf8String>(PICK_ADDRESS(0x00A31B50, 0));
+Utf8String &s_theSystemString = Make_Global<Utf8String>(PICK_ADDRESS(0x00A31B54, 0));
+
+// gamewindowtransitions.cpp
+class GameWindowTransitionsHandler;
+GameWindowTransitionsHandler *&g_theTransitionHandler =
+    Make_Global<GameWindowTransitionsHandler *>(PICK_ADDRESS(0x00A2C094, 0x0));

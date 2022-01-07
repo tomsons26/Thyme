@@ -14,21 +14,25 @@
  */
 
 #include "gamewindow.h"
-
 #include "audioeventrts.h"
 #include "audiomanager.h"
 #include "displaystring.h"
 #include "gamelogic.h"
+#include "gamewindowmanager.h"
+#include "ingameui.h"
+#include "view.h"
+#include "windowlayout.h"
 
-#if 0
 GameWindow::GameWindow() :
     m_status(0),
     m_size{ 0, 0 },
-    m_region{0, 0, 0, 0},
+    m_region{ 0, 0, 0, 0 },
     m_cursorX(0),
     m_cursorY(0),
     m_userData(nullptr),
+#ifdef GAME_DEBUG_STRUCTS
     m_inputData(nullptr),
+#endif
     m_input(nullptr),
     m_system(nullptr),
     m_draw(nullptr),
@@ -42,13 +46,13 @@ GameWindow::GameWindow() :
     m_layout(nullptr),
     m_editData(nullptr)
 {
-    // TODO, needs WindowManager
-    // Win_Set_Draw_Func;
-    // Win_Set_Input_Func;
-    // Win_Set_System_Func;
-    // Win_Set_Tooltip_Func;
+    Win_Set_Draw_Func(g_theWindowManager->Get_Default_Draw());
+    Win_Set_Input_Func(g_theWindowManager->Get_Default_Input());
+    Win_Set_System_Func(g_theWindowManager->Get_Default_System());
+
+    // TODO, this is how its in game, investigate if isn't a bug and should this actually be Get_Default_Tooltip
+    Win_Set_Tooltip_Func(nullptr);
 }
-#endif
 
 GameWindow::~GameWindow()
 {
@@ -64,6 +68,109 @@ void GameWindow::Normalize_Window_Region()
     std::swap(m_region.lo.y, m_region.hi.y);
 }
 
+GameWindow *GameWindow::Find_First_Leaf()
+{
+    GameWindow *i;
+
+    for (i = this; i->m_parent; i = i->m_parent) {
+        ;
+    }
+
+    while (i->m_child) {
+        i = i->m_child;
+    }
+
+    return i;
+}
+
+GameWindow *GameWindow::Find_Last_Leaf()
+{
+    GameWindow *i; // [esp+4h] [ebp-4h]
+
+    for (i = this; i->m_parent; i = i->m_parent) {
+        ;
+    }
+
+    while (i->m_child) {
+        for (i = i->m_child; i->m_next; i = i->m_next) {
+            ;
+        }
+    }
+
+    return i;
+}
+
+GameWindow *GameWindow::Find_Prev_Leaf()
+{
+    GameWindow *result;
+
+    GameWindow *k = this;
+    if (m_prev) {
+        GameWindow *i = m_prev;
+        while (i->m_child && !(i->m_status & 0x100)) {
+            for (i = i->m_child; i->m_next; i = i->m_next) {
+                ;
+            }
+        }
+        result = i;
+    } else {
+        while (k->m_parent) {
+            k = k->m_parent;
+            if (k->m_parent && k->m_prev) {
+                GameWindow *j = k->m_prev;
+                while (j->m_child && !(j->m_status & 0x100)) {
+                    for (j = j->m_child; j->m_next; j = j->m_next) {
+                        ;
+                    }
+                }
+                return j;
+            }
+        }
+        if (k) {
+            result = k->Find_Last_Leaf();
+        } else {
+            result = nullptr;
+        }
+    }
+    return result;
+}
+
+GameWindow *GameWindow::Find_Next_Leaf()
+{
+    GameWindow *result;
+
+    GameWindow *j = this;
+    if (m_next) {
+        if (m_next->m_status & 0x100) {
+            result = m_next;
+        } else {
+            for (GameWindow *i = m_next; i; i = i->m_child) {
+                if (!i->m_child || i->m_status & 0x100) {
+                    return i;
+                }
+            }
+            result = 0;
+        }
+    } else {
+        while (j->m_parent) {
+            j = j->m_parent;
+            if (j->m_parent && j->m_next) {
+                for (j = j->m_next; j; j = j->m_child) {
+                    if (!j->m_child || j->m_status & 0x100) {
+                        return j;
+                    }
+                }
+            }
+        }
+        if (j) {
+            result = j->Find_First_Leaf();
+        } else {
+            result = nullptr;
+        }
+    }
+    return result;
+}
+
 int GameWindow::Win_Next_Tab()
 {
     return 0;
@@ -71,6 +178,50 @@ int GameWindow::Win_Next_Tab()
 
 int GameWindow::Win_Prev_Tab()
 {
+    return 0;
+}
+
+int GameWindow::Win_Bring_To_Top()
+{
+    GameWindow *window = this;
+    GameWindow *parent = Win_Get_Parent();
+
+    if (parent != nullptr) {
+        g_theWindowManager->Unlink_Child_Window(window);
+        g_theWindowManager->Add_Window_To_Parent(window, parent);
+
+    } else {
+        for (GameWindow *i = g_theWindowManager->Win_Get_Window_List(); i != window; i = i->m_next) {
+            if (i == nullptr) {
+                // TODO figure out what -3 means
+                return -3;
+            }
+        }
+        g_theWindowManager->Unlink_Window(window);
+        g_theWindowManager->Link_Window(window);
+    }
+    if (window->m_layout == nullptr) {
+        return 0;
+    }
+
+    window->m_layout->Remove_Window(window);
+    window->m_layout->Add_Window(window);
+
+    return 0;
+}
+
+int GameWindow::Win_Activate()
+{
+    int res = Win_Bring_To_Top();
+
+    if (res) {
+        return res;
+    }
+
+    m_status |= 1;
+
+    Win_Hide(false);
+
     return 0;
 }
 
@@ -163,6 +314,20 @@ bool GameWindow::Win_Point_In_Window(int x, int y)
     return x >= win_x && x <= width + win_x && y >= win_y && y <= height + win_y;
 }
 
+int GameWindow::Win_Set_Size(int width, int height)
+{
+    m_size.x = width;
+    m_size.y = height;
+
+    m_region.hi.x = width + m_region.lo.x;
+    m_region.hi.y = height + m_region.lo.y;
+
+    // TODO figure out what 16388 means
+    g_theWindowManager->Win_Send_System_Msg(this, 16388, width, height);
+
+    return 0;
+}
+
 int GameWindow::Win_Get_Size(int *width, int *height)
 {
     if (!width || !height) {
@@ -194,6 +359,24 @@ int GameWindow::Win_Enable(bool enable)
 bool GameWindow::Win_Is_Enabled()
 {
     return (m_status & WIN_STATUS_ENABLED) != 0;
+}
+
+int GameWindow::Win_Hide(bool hide)
+{
+    if (hide) {
+
+        // TODO figure out what 0x8000 means
+        if (!(m_status & 0x8000)) {
+            // GameWindow_86F230(this); seems to be a no op
+        }
+
+        m_status |= WIN_STATUS_HIDDEN;
+        g_theWindowManager->Window_Hiding(this);
+
+    } else {
+        m_status &= ~WIN_STATUS_HIDDEN;
+    }
+    return 0;
 }
 
 bool GameWindow::Win_Is_Hidden()
@@ -377,6 +560,24 @@ int GameWindow::Win_Get_Window_Id()
     return m_instData.m_id;
 }
 
+int GameWindow::Win_Set_Parent(GameWindow *window)
+{
+    if (m_parent == nullptr) {
+        g_theWindowManager->Unlink_Window(this);
+    } else {
+        g_theWindowManager->Unlink_Child_Window(this);
+    }
+
+    if (window == nullptr) {
+        g_theWindowManager->Link_Window(this);
+        m_parent = nullptr;
+    } else {
+        g_theWindowManager->Add_Window_To_Parent(this, window);
+    }
+
+    return 0;
+}
+
 GameWindow *GameWindow::Win_Get_Parent()
 {
     return m_parent;
@@ -464,9 +665,51 @@ GameWindow *GameWindow::Win_Get_Prev_In_Layout()
     return m_prevLayout;
 }
 
+int GameWindow::Win_Set_System_Func(WindowCallbackFunc system_func)
+{
+    if (system_func != nullptr) {
+        m_system = system_func;
+    } else {
+        m_system = g_theWindowManager->Get_Default_System();
+    }
+
+    return 0;
+}
+
+int GameWindow::Win_Set_Input_Func(WindowCallbackFunc input_func)
+{
+    if (input_func != nullptr) {
+        m_input = input_func;
+    } else {
+        m_input = g_theWindowManager->Get_Default_Input();
+    }
+
+    return 0;
+}
+
+int GameWindow::Win_Set_Draw_Func(WindowDrawFunc draw_func)
+{
+    if (draw_func != nullptr) {
+        m_draw = draw_func;
+    } else {
+        m_draw = g_theWindowManager->Get_Default_Draw();
+    }
+
+    return 0;
+}
+
 int GameWindow::Win_Set_Tooltip_Func(WindowTooltipFunc tooltip)
 {
     m_tooltip = tooltip;
+
+    return 0;
+}
+
+int GameWindow::Win_Set_Callbacks(WindowCallbackFunc input, WindowDrawFunc draw, WindowTooltipFunc tooltip)
+{
+    Win_Set_Input_Func(input);
+    Win_Set_Draw_Func(draw);
+    Win_Set_Tooltip_Func(tooltip);
 
     return 0;
 }
@@ -667,4 +910,38 @@ void GameWindow::Win_Set_Edit_Data(GameWindowEditData *edit_data)
 GameWindowEditData *GameWindow::Win_Get_Edit_Data()
 {
     return m_editData;
+}
+
+int __cdecl GameWinDefaultInput(GameWindow *window, unsigned int message, unsigned int data_1, unsigned int data_2)
+{
+    return 0;
+}
+
+WindowMsgHandledType Game_Win_Block_Input(GameWindow *window, unsigned int msg, unsigned int data_1, unsigned int data_2)
+{
+    if (msg == GWM_CHAR || msg == GWM_MOUSE_POS) {
+        return MSG_IGNORED;
+    }
+
+    if (msg == GWM_LEFT_UP) {
+        //sub_A1F429(TheSelectionTranslator, 0);
+        //sub_A1F413(TheSelectionTranslator, 0);
+
+        g_theTacticalView->Set_Mouse_Lock(false);
+
+        //(*(g_theInGameUI + 0x84))(0);
+        //(*(g_theInGameUI + 0x44))(0);
+    }
+
+    return MSG_HANDLED;
+}
+
+int GameWinDefaultSystem(GameWindow *window, unsigned int message, unsigned int data_1, unsigned int data_2)
+{
+    return 0;
+}
+
+void GameWinDefaultTooltip(GameWindow *window, WinInstanceData *instance, unsigned int mouse)
+{
+    ;
 }

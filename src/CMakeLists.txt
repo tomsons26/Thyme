@@ -96,8 +96,10 @@ set(GAMEENGINE_SRC
     game/client/draw/tintenvelope.cpp
     game/client/gui/gamefont.cpp
     game/client/gui/gamewindow.cpp
+    game/client/gui/gamewindowscript.cpp
     game/client/gui/gamewindowtransitions.cpp
     game/client/gui/loadscreen.cpp
+    game/client/gui/gamewindowmanager.cpp
     game/client/gui/wininstancedata.cpp
     game/client/gui/windowlayout.cpp
     game/client/image.cpp
