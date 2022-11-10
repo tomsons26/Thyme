@@ -347,7 +347,7 @@ int RefPack_Uncompress(void *dst, const void *src, int *size)
 /**
  * Compresses EA's proprietary "RefPack" format.
  */
-int RefPack_Compress(void *dst, const void *src, int size, bool quick)
+int RefPack_Compress(void *dst, const void *src, int size, int *unused)
 {
     uint8_t *putp = static_cast<uint8_t *>(dst);
     int header_len = 0;
@@ -369,5 +369,5 @@ int RefPack_Compress(void *dst, const void *src, int size, bool quick)
         header_len = 6;
     }
 
-    return header_len + RefPack_Encode(src, size, &putp[header_len], 0x20000, quick);
+    return header_len + RefPack_Encode(src, size, &putp[header_len], 0x20000, false);
 }
