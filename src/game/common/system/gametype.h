@@ -252,6 +252,17 @@ enum Relationship
     ALLIES,
 };
 
+enum
+{
+    AI_DEBUG_NONE,
+    AI_DEBUG_LEVEL_1,
+    AI_DEBUG_LEVEL_2,
+    AI_DEBUG_LEVEL_3,
+    AI_DEBUG_LEVEL_4,
+    AI_DEBUG_LEVEL_5,
+    AI_DEBUG_END,
+};
+
 extern const char *g_timeOfDayNames[TIME_OF_DAY_COUNT + 1];
 extern const char *g_weatherNames[WEATHER_COUNT + 1];
 extern const char *g_bodyDamageNames[BODY_COUNT + 1];

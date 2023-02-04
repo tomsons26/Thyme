@@ -17,103 +17,18 @@
 #include "coord.h"
 #include "gametype.h"
 #include "mempoolobj.h"
+#include "pathfinder_zonemanager.h"
 #include "snapshot.h"
 
+class Path;
+class PathfindZoneManager;
 class Bridge;
 class Locomotor;
 class LocomotorSet;
 class Object;
 class PathfindCell;
 class Weapon;
-
-class ZoneBlock
-{
-private:
-    ICoord2D m_pos; // not 100% confirmed
-    unsigned short m_firstZone; // confirmed
-    unsigned short m_maxZone; // confirmed
-    unsigned short m_zoneInfoSize; // confirmed
-    unsigned short *m_pathfindZoneInfoCliff; // not 100% confirmed
-    unsigned short *m_pathfindZoneInfoWater; // not 100% confirmed
-    unsigned short *m_pathfindZoneInfoRubble; // not 100% confirmed
-    unsigned short *m_pathfindZoneInfoUnk; // not 100% confirmed
-    bool m_bridge; // not 100% confirmed
-    bool m_passable; // not 100% confirmed
-};
-
-class PathfindZoneManager
-{
-public:
-    PathfindZoneManager();
-    ~PathfindZoneManager();
-
-private:
-    ZoneBlock *m_zoneBlocks; // not 100% confirmed
-    ZoneBlock **m_zoneBlockPointers; // not 100% confirmed
-    ICoord2D m_zoneBlockExtent; // confirmed
-    unsigned short m_maxZone; // confirmed
-    unsigned int m_updateFrequency; // not 100% confirmed
-    unsigned short m_zoneTableSize; // not 100% confirmed
-    unsigned short *m_zoneTableCliff; // confirmed
-    unsigned short *m_zoneTableWater; // confirmed
-    unsigned short *m_zoneTableRubble; // confirmed
-    unsigned short *m_zoneTableObstacle; // confirmed
-    unsigned short *m_zoneTableUnk; // not 100% confirmed
-    unsigned short *m_zoneTableUnk2; // not 100% confirmed
-};
-
-// confirmed
-struct ClosestPointOnPathInfo
-{
-    float m_distance;
-    Coord3D m_pos;
-    PathfindLayerEnum m_layer;
-};
-
-class PathNode : public MemoryPoolObject
-{
-    IMPLEMENT_POOL(PathNode)
-
-public:
-    virtual ~PathNode() override;
-
-private:
-    int m_optimizedLink; // not 100% confirmed
-    PathNode *m_nextOpti; // confirmed
-    PathNode *m_next; // confirmed
-    PathNode *m_prev; // confirmed
-    Coord3D m_pos; // confirmed
-    PathfindLayerEnum m_layer; // not 100% confirmed
-    bool m_unkBool; // not 100% confirmed
-    float m_optimizedLength; // not 100% confirmed
-    Coord2D m_optimizedPos; // not 100% confirmed
-};
-
-class Path : public MemoryPoolObject, public SnapShot
-{
-    IMPLEMENT_POOL(Path);
-
-protected:
-    virtual ~Path() override;
-
-public:
-    virtual void CRC_Snapshot(Xfer *xfer) override;
-    virtual void Xfer_Snapshot(Xfer *xfer) override;
-    virtual void Load_Post_Process() override;
-
-    void Get_Point_Pos(Coord3D *pos) const { *pos = m_closestPoint.m_pos; }
-
-private:
-    PathNode *m_pathHead; // confirmed
-    PathNode *m_pathTail; // confirmed
-    bool m_isOptimized; // confirmed
-    bool m_blockedByAlly; // confirmed
-    bool m_unk2; // not 100% confirmed
-    int m_unk3; // not 100% confirmed
-    Coord3D m_unk4; // not 100% confirmed
-    ClosestPointOnPathInfo m_closestPoint; // not 100% confirmed
-    PathNode *m_unkNode; // not 100% confirmed
-};
+class PathfindLayer;
 
 class PathfindServicesInterface
 {
@@ -141,84 +56,33 @@ public:
         float f) = 0;
 };
 
-class PathfindCellInfo
-{
-public:
-    static void Allocate_Cell_Infos();
-    static void Release_Cell_Infos();
-
-private:
-    enum
-    {
-        MAX_CELL_INFOS = 30000,
-    };
-
-    PathfindCellInfo *m_next; // confirmed
-    PathfindCellInfo *m_prev; // confirmed
-    PathfindCellInfo *m_pathParent; // confirmed
-    PathfindCell *m_cell; // confirmed
-    unsigned short m_totalCost; // confirmed
-    unsigned short m_costSoFar; // confirmed
-    ICoord2D m_pos; // confirmed
-    ObjectID m_goalUnitID; // confirmed
-    ObjectID m_posUnitID; // confirmed
-    ObjectID m_goalAircraftID; // confirmed
-    ObjectID m_obstacleID; // confirmed
-    bool m_isFree : 1; // confirmed
-    bool m_blockedByAlly : 1; // confirmed
-    bool m_unk2 : 1; // not 100% confirmed
-    bool m_unk3 : 1; // not 100% confirmed
-    bool m_open : 1; // confirmed
-    bool m_closed : 1; // confirmed
-
-#ifdef GAME_DLL
-    static PathfindCellInfo *&m_infoArray;
-    static PathfindCellInfo *&m_firstFree;
-#else
-    static PathfindCellInfo *m_infoArray;
-    static PathfindCellInfo *m_firstFree;
-#endif
-};
-
-class PathfindCell
-{
-    enum CellType
-    {
-        CELL_CLEAR, // confirmed
-        CELL_WATER, // confirmed
-        CELL_CLIFF, // confirmed
-        CELL_RUBBLE, // confirmed
-        CELL_OBSTACLE, // confirmed
-        CELL_TYPE_5,
-        CELL_TYPE_6,
-    };
-
-    enum CellFlags
-    {
-        NO_UNITS = 0,
-        UNIT_GOAL = 1,
-        UNIT_PRESENT_MOVING = 2,
-        UNIT_PRESENT_FIXED = 3,
-        UNIT_GOAL_OTHER_MOVING = 5,
-    };
-
-private:
-    PathfindCellInfo *m_info; // confirmed
-    unsigned short m_zone : 14; // confirmed
-    unsigned char m_aircraftGoal : 1; // confirmed
-    unsigned char m_unk2 : 1; // not 100% confirmed
-    unsigned char m_type : 4; // confirmed
-    unsigned char m_flags : 4; // not 100% confirmed
-    unsigned char m_connectLayer : 4; // not 100% confirmed
-    unsigned char m_layer2 : 4; // not 100% confirmed
-};
-
 class PathfindLayer
 {
 public:
     PathfindLayer();
     ~PathfindLayer();
     void Reset();
+
+    bool Is_Unused();
+
+    bool Init(Bridge *bridge, PathfindLayerEnum layer);
+
+    bool Connects_Zones(PathfindZoneManager *manager, LocomotorSet *loco, int zone1, int zone2);
+
+    bool Set_Destroyed(bool state);
+    bool Is_Destroyed() { return m_destroyed; }
+    
+    void Apply_Zone();
+
+    ObjectID Get_Bridge_ID();
+
+    PathfindCell *Get_Cell(int x, int y);
+
+    void Set_Zone(unsigned int zone) { m_zone = zone; }
+    unsigned int Get_Zone() { return m_zone; }
+
+    void Get_UnkCell1(ICoord2D &cell) { cell = m_unk1; }
+    void Get_UnkCell2(ICoord2D &cell) { cell = m_unk1; }
 
 private:
     PathfindCell *m_cells; // confirmed
@@ -245,6 +109,8 @@ public:
 
     Pathfinder();
     ~Pathfinder();
+
+    PathfindCell *Get_Cell(PathfindLayerEnum layer, int x, int y);
 
     virtual Path *Find_Path(
         Object *obj, const LocomotorSet &locomotor_set, const Coord3D *from, const Coord3D *raw_to) override;
@@ -308,3 +174,20 @@ private:
     int m_queuePRTail; // confirmed
     int m_cumulativeCellsAllocated; // confirmed
 };
+
+inline PathfindCell *Pathfinder::Get_Cell(PathfindLayerEnum layer, int x, int y)
+{
+    if (x >= m_extent.lo.x && x <= m_extent.hi.x && y >= m_extent.lo.y && y <= m_extent.hi.y) {
+        if (layer > LAYER_GROUND && layer <= LAYER_WALLS)
+        {
+            PathfindCell *cell = m_layers[layer].Get_Cell(x, y);
+            if (cell != nullptr) {
+                return cell;
+            }
+        }
+
+        return &m_map[x][y];
+    }
+
+    return nullptr;
+}

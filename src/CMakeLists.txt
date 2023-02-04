@@ -30,6 +30,7 @@ set(GAMEENGINE_INCLUDES
     game/logic/object/contain
     game/logic/object/die
     game/logic/object/update
+    game/logic/pathfinder
     game/logic/scriptengine
     game/logic/system
     game/network
@@ -273,6 +274,11 @@ set(GAMEENGINE_SRC
     game/logic/object/update/projectilestreamupdate.cpp
     game/logic/object/update/swayclientupdate.cpp
     game/logic/object/die/specialpowercompletiondie.cpp
+    game/logic/pathfinder/pathfinder.cpp
+    game/logic/pathfinder/pathfinder_cell.cpp
+    game/logic/pathfinder/pathfinder_layer.cpp
+    game/logic/pathfinder/pathfinder_path.cpp
+    game/logic/pathfinder/pathfinder_zonemanager.cpp
     game/logic/scriptengine/script.cpp
     game/logic/scriptengine/scriptengine.cpp
     game/logic/scriptengine/scriptaction.cpp
